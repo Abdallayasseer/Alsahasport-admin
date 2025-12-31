@@ -1,5 +1,6 @@
-import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+import PageTransition from "./PageTransition";
 // Removed Navbar import since user profile is now in Sidebar and we want a cleaner look
 
 const MainLayout = () => {
@@ -15,7 +16,9 @@ const MainLayout = () => {
         <div className="pointer-events-none absolute bottom-[-10%] left-[10%] h-[300px] w-[300px] rounded-full bg-violet-500/5 blur-[80px]" />
 
         <main className="flex-1 overflow-y-auto p-8 relative z-10 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-zinc-800">
-          <Outlet />
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
         </main>
       </div>
     </div>
