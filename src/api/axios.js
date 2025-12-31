@@ -24,7 +24,18 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Prevent infinite loops if refresh fails
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Also skip refresh for specific endpoints that return 401 on logic failure (not token expiry)
+    const isPasswordVerification =
+      originalRequest.url?.includes("/verify-master-password") ||
+      originalRequest.url?.includes("/reveal") ||
+      (originalRequest.method === "delete" &&
+        originalRequest.url?.includes("/codes"));
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isPasswordVerification
+    ) {
       originalRequest._retry = true;
 
       try {

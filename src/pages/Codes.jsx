@@ -1,92 +1,128 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, ChevronLeft, ChevronRight, Search, Ticket, Users, Clock, Copy, Check, Lock, X } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import toast from 'react-hot-toast';
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Plus,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Ticket,
+  Users,
+  Clock,
+  Copy,
+  Check,
+  Lock,
+  X,
+} from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import toast from "react-hot-toast";
 
-import api from '../api/axios';
-import RoleGuard from '../components/guard/RoleGuard';
-import { Button } from '../components/ui/Button';
+import api from "../api/axios";
+import RoleGuard from "../components/guard/RoleGuard";
+import { Button } from "../components/ui/Button";
 
-// --- API Functions (Same as before) ---
-const fetchCodes = async (page = 1, limit = 10, search = '') => {
-  const { data } = await api.get('/admin/codes', {
+// --- API Functions ---
+const fetchCodes = async (page = 1, limit = 10, search = "") => {
+  const { data } = await api.get("/admin/codes", {
     params: { page, limit, search },
   });
   return data;
 };
 
 const createCode = async (codeData) => {
-  const { data } = await api.post('/admin/codes', codeData);
+  const { data } = await api.post("/admin/codes", codeData);
   return data;
 };
 
-const deleteCode = async (codeId) => {
-  await api.delete(`/admin/codes/${codeId}`);
+/* New Verification Function */
+const verifyPassword = async (password) => {
+  const { data } = await api.post("/admin/verify-master-password", {
+    password,
+  });
+  return data.success;
 };
 
 // --- Validation ---
 const codeSchema = z.object({
-  durationDays: z.number().min(1, 'Duration must be at least 1 day'),
-  maxDevices: z.number().min(1, 'Max devices must be at least 1'),
+  durationDays: z.number().min(1, "Duration must be at least 1 day"),
+  maxDevices: z.number().min(1, "Max devices must be at least 1"),
 });
 
 const Codes = () => {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
+  /* New State for Delete Confirmation */
+  const [deleteId, setDeleteId] = useState(null);
+  const [deletePassword, setDeletePassword] = useState("");
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createdCode, setCreatedCode] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
-  
+
   // Reveal Logic State
   const [revealId, setRevealId] = useState(null);
-  const [revealPassword, setRevealPassword] = useState('');
+  const [revealPassword, setRevealPassword] = useState("");
   const [isRevealing, setIsRevealing] = useState(false);
 
-  // Add state to show the created code info if needed, or just toast for now.
-  
   const queryClient = useQueryClient();
 
   // Backend doesn't support pagination yet, so we just fetch all.
-  // We keep search state for potential client-side filtering or future API update.
-  const { data: responseData, isLoading, isError } = useQuery({
-    queryKey: ['codes', search],
+  const {
+    data: responseData,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["codes", search],
     queryFn: () => fetchCodes(1, 1000, search), // Fetch all (pseudo)
     keepPreviousData: true,
   });
-  
-  // The backend returns { success: true, data: [...] }
+
   const codes = responseData?.data || [];
 
   const createMutation = useMutation({
     mutationFn: createCode,
     onSuccess: (response) => {
-      queryClient.invalidateQueries(['codes']);
-      toast.success('Code created successfully');
+      queryClient.invalidateQueries(["codes"]);
+      toast.success("Code created successfully");
       setIsCreateModalOpen(false);
       setCreatedCode(response.data);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.message || 'Failed to create code');
+      toast.error(err.response?.data?.message || "Failed to create code");
     },
   });
 
+  /* Updated Delete Mutation with Two-Step Verification */
   const deleteMutation = useMutation({
-    mutationFn: deleteCode,
+    mutationFn: async ({ id, password }) => {
+      // Step 1: Verify Password explicitly (as requested)
+      await verifyPassword(password);
+      // Step 2: Proceed with Delete (passing password again for backend security)
+      await api.delete(`/admin/codes/${id}`, { data: { password } });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries(['codes']);
-      toast.success('Code deleted successfully');
+      queryClient.invalidateQueries(["codes"]);
+      toast.success("Code deleted successfully");
+      setDeleteId(null);
+      setDeletePassword("");
     },
     onError: (err) => {
-      toast.error(err.response?.data?.message || 'Failed to delete code');
+      // Handle "Incorrect password" specifically
+      const msg = err.response?.data?.message || "Failed to delete code";
+      toast.error(msg);
+      // We do not logout (handled by axios interceptor fix), allows retry
     },
   });
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this code?')) {
-      deleteMutation.mutate(id);
-    }
+  const handleDeleteClick = (id) => {
+    setDeleteId(id);
+  };
+
+  const handleConfirmDelete = async (e) => {
+    e.preventDefault();
+    if (!deletePassword) return toast.error("Password required");
+    deleteMutation.mutate({ id: deleteId, password: deletePassword });
   };
 
   const copyToClipboard = async (text, id = null) => {
@@ -96,15 +132,18 @@ const Codes = () => {
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
       }
-      toast.success('Code copied successfully');
+      toast.success("Code copied successfully");
     } catch {
-      toast.error('Failed to copy');
+      toast.error("Failed to copy");
     }
   };
 
-
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
     resolver: zodResolver(codeSchema),
   });
 
@@ -115,30 +154,45 @@ const Codes = () => {
 
   const handleReveal = async (e) => {
     e.preventDefault();
-    if (!revealPassword) return toast.error('Password required');
-    
+    if (!revealPassword) return toast.error("Password required");
+
     setIsRevealing(true);
     try {
-      const { data } = await api.post(`/admin/codes/${revealId}/reveal`, { password: revealPassword });
+      // Step 1: Verify Password explicitly
+      await verifyPassword(revealPassword);
+
+      // Step 2: Reveal & Copy (Passing password again as required by backend reveal endpoint)
+      const { data } = await api.post(`/admin/codes/${revealId}/reveal`, {
+        password: revealPassword,
+      });
       await navigator.clipboard.writeText(data.data.code);
-      toast.success('Code copied successfully');
+      toast.success("Code copied successfully");
       setRevealId(null);
-      setRevealPassword('');
+      setRevealPassword("");
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Verification failed');
+      toast.error(err.response?.data?.message || "Verification failed");
+      // Clear password on failure as requested
+      setRevealPassword("");
     } finally {
       setIsRevealing(false);
     }
   };
 
-  if (isError) return <div className="p-8 text-center text-red-400">Error loading codes...</div>;
+  if (isError)
+    return (
+      <div className="p-8 text-center text-red-400">Error loading codes...</div>
+    );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Access Codes</h1>
-          <p className="mt-2 text-sm text-zinc-400">Manage digital access keys.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            Access Codes
+          </h1>
+          <p className="mt-2 text-sm text-zinc-400">
+            Manage digital access keys.
+          </p>
         </div>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Generate Code
@@ -161,83 +215,108 @@ const Codes = () => {
           <table className="min-w-full divide-y divide-white/5">
             <thead>
               <tr className="bg-white/[0.02]">
-                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">Code ID</th>
-                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">Duration</th>
-                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">Capacity</th>
-                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">Status</th>
-                <th className="px-6 py-5 text-right text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">Actions</th>
+                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">
+                  Code ID
+                </th>
+                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">
+                  Duration
+                </th>
+                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">
+                  Capacity
+                </th>
+                <th className="px-6 py-5 text-left text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">
+                  Status
+                </th>
+                <th className="px-6 py-5 text-right text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {isLoading ? (
-                // Dark Skeletons
-                [...Array(5)].map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-6 py-5"><div className="h-5 w-32 rounded bg-zinc-800 animate-pulse"></div></td>
-                    <td className="px-6 py-5"><div className="h-5 w-16 rounded bg-zinc-800 animate-pulse"></div></td>
-                    <td className="px-6 py-5"><div className="h-5 w-20 rounded bg-zinc-800 animate-pulse"></div></td>
-                    <td className="px-6 py-5"><div className="h-5 w-16 rounded bg-zinc-800 animate-pulse"></div></td>
-                    <td className="px-6 py-5"><div className="h-5 w-8 rounded bg-zinc-800 animate-pulse ml-auto"></div></td>
-                  </tr>
-                ))
-              ) : (
-                codes.map((code) => (
-                  <tr key={code._id} className="group transition-all duration-200 hover:bg-white/[0.03]">
-                    <td className="whitespace-nowrap px-6 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
+              {isLoading
+                ? // Dark Skeletons
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-5">
+                        <div className="h-5 w-32 rounded bg-zinc-800 animate-pulse"></div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="h-5 w-16 rounded bg-zinc-800 animate-pulse"></div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="h-5 w-20 rounded bg-zinc-800 animate-pulse"></div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="h-5 w-16 rounded bg-zinc-800 animate-pulse"></div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="h-5 w-8 rounded bg-zinc-800 animate-pulse ml-auto"></div>
+                      </td>
+                    </tr>
+                  ))
+                : codes.map((code) => (
+                    <tr
+                      key={code._id}
+                      className="group transition-all duration-200 hover:bg-white/[0.03]"
+                    >
+                      <td className="whitespace-nowrap px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
                             <Ticket className="h-5 w-5" />
+                          </div>
+                          <div className="font-mono text-zinc-400 text-xs">
+                            ...{code._id.slice(-6)}
+                          </div>
+                          <button
+                            onClick={() => setRevealId(code._id)}
+                            className="ml-2 rounded-md p-1 hover:bg-white/10 text-zinc-500 hover:text-white transition-all focus:outline-none"
+                            title="Copy Code (Secure)"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
                         </div>
-                        <div className="font-mono text-zinc-400 text-xs">...{code._id.slice(-6)}</div>
-                        <button 
-                          onClick={() => setRevealId(code._id)}
-                          className="ml-2 rounded-md p-1 hover:bg-white/10 text-zinc-500 hover:text-white transition-all focus:outline-none"
-                          title="Copy Code (Secure)"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-5">
-                         <div className="flex items-center gap-2 text-sm text-zinc-400">
-                            <Clock className="h-4 w-4 text-zinc-600" />
-                            {code.durationDays} Days
-                         </div>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-5">
-                       <div className="flex items-center gap-2 text-sm text-zinc-400">
-                            <Users className="h-4 w-4 text-zinc-600" />
-                            <span className="text-zinc-200">{code.usedCount || 0}</span> / {code.maxDevices}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-5">
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                          <Clock className="h-4 w-4 text-zinc-600" />
+                          {code.durationDays} Days
                         </div>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-5">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
-                        code.status === 'active' || code.status === 'unused'
-                          ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.1)]' 
-                          : 'bg-red-500/10 text-red-400 ring-red-500/20'
-                      }`}>
-                        {code.status}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-5 text-right text-sm font-medium">
-                      <RoleGuard allowedRoles={['MASTER_ADMIN']}>
-                        <button 
-                          onClick={() => handleDelete(code._id)}
-                          className="text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 bg-white/5 p-2 rounded-lg hover:bg-white/10"
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-5">
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                          <Users className="h-4 w-4 text-zinc-600" />
+                          <span className="text-zinc-200">
+                            {code.usedCount || 0}
+                          </span>{" "}
+                          / {code.maxDevices}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+                            code.status === "active" || code.status === "unused"
+                              ? "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.1)]"
+                              : "bg-red-500/10 text-red-400 ring-red-500/20"
+                          }`}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </RoleGuard>
-                    </td>
-                  </tr>
-                ))
-              )}
+                          {code.status}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-5 text-right text-sm font-medium">
+                        <RoleGuard allowedRoles={["MASTER_ADMIN"]}>
+                          <button
+                            onClick={() => handleDeleteClick(code._id)}
+                            className="text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 bg-white/5 p-2 rounded-lg hover:bg-white/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </RoleGuard>
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>
-        
-        {/* Dark Pagination (Disabled for now as API might not support it yet or returns all) */}
-        {/* ... existing pagination ... */}
       </div>
 
       {/* Create Modal (Dark Theme) */}
@@ -245,27 +324,61 @@ const Codes = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 transition-all animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-white/10 p-8 shadow-2xl ring-1 ring-white/10">
             <div className="mb-6">
-                <h2 className="text-xl font-bold text-white">Generate Access Key</h2>
-                <p className="mt-1 text-sm text-zinc-400">Create a new secure entry point.</p>
+              <h2 className="text-xl font-bold text-white">
+                Generate Access Key
+              </h2>
+              <p className="mt-1 text-sm text-zinc-400">
+                Create a new secure entry point.
+              </p>
             </div>
-            
+
             <form onSubmit={handleSubmit(onSubmitCreate)} className="space-y-6">
               <div className="grid grid-cols-2 gap-5">
                 <div>
-                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wide">Validity (Days)</label>
-                    <input type="number" {...register('durationDays', { valueAsNumber: true })} className="mt-2 block w-full rounded-xl border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                    {errors.durationDays && <p className="mt-1 text-xs text-red-400">{errors.durationDays.message}</p>}
+                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                    Validity (Days)
+                  </label>
+                  <input
+                    type="number"
+                    {...register("durationDays", { valueAsNumber: true })}
+                    className="mt-2 block w-full rounded-xl border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  />
+                  {errors.durationDays && (
+                    <p className="mt-1 text-xs text-red-400">
+                      {errors.durationDays.message}
+                    </p>
+                  )}
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wide">Max Devices</label>
-                    <input type="number" {...register('maxDevices', { valueAsNumber: true })} className="mt-2 block w-full rounded-xl border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                    {errors.maxDevices && <p className="mt-1 text-xs text-red-400">{errors.maxDevices.message}</p>}
+                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                    Max Devices
+                  </label>
+                  <input
+                    type="number"
+                    {...register("maxDevices", { valueAsNumber: true })}
+                    className="mt-2 block w-full rounded-xl border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  />
+                  {errors.maxDevices && (
+                    <p className="mt-1 text-xs text-red-400">
+                      {errors.maxDevices.message}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-white/5">
-                <Button type="button" variant="ghost" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={createMutation.isLoading} className="shadow-indigo-500/20">
-                    {createMutation.isLoading ? 'Generating...' : 'Create Key'}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsCreateModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isLoading}
+                  className="shadow-indigo-500/20"
+                >
+                  {createMutation.isLoading ? "Generating..." : "Create Key"}
                 </Button>
               </div>
             </form>
@@ -273,37 +386,106 @@ const Codes = () => {
         </div>
       )}
 
-      {/* Verify Password Modal */}
+      {/* Verify Password Modal (Reveal) */}
       {revealId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 transition-all animate-in fade-in duration-200">
-           <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-white/10 p-6 shadow-2xl ring-1 ring-white/10">
-               <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                     <Lock className="h-4 w-4 text-indigo-400" /> Security Check
-                  </h3>
-                  <button onClick={() => setRevealId(null)} className="text-zinc-500 hover:text-white">
-                      <X className="h-5 w-5" />
-                  </button>
-               </div>
-               <p className="text-sm text-zinc-400 mb-4">Enter master password to reveal and copy code.</p>
-               
-               <form onSubmit={handleReveal}>
-                  <input 
-                    type="password" 
-                    autoFocus
-                    placeholder="Enter password..."
-                    className="w-full rounded-xl border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500 text-sm mb-4"
-                    value={revealPassword}
-                    onChange={(e) => setRevealPassword(e.target.value)}
-                  />
-                  <div className="flex justify-end gap-2">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setRevealId(null)}>Cancel</Button>
-                      <Button type="submit" size="sm" disabled={isRevealing} className="bg-indigo-600 hover:bg-indigo-500">
-                          {isRevealing ? 'Verifying...' : 'Reveal & Copy'}
-                      </Button>
-                  </div>
-               </form>
-           </div>
+          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-white/10 p-6 shadow-2xl ring-1 ring-white/10">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Lock className="h-4 w-4 text-indigo-400" /> Security Check
+              </h3>
+              <button
+                onClick={() => setRevealId(null)}
+                className="text-zinc-500 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-zinc-400 mb-4">
+              Enter master password to reveal and copy code.
+            </p>
+
+            <form onSubmit={handleReveal}>
+              <input
+                type="password"
+                autoFocus
+                placeholder="Enter password..."
+                className="w-full rounded-xl border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500 text-sm mb-4"
+                value={revealPassword}
+                onChange={(e) => setRevealPassword(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRevealId(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isRevealing}
+                  className="bg-indigo-600 hover:bg-indigo-500"
+                >
+                  {isRevealing ? "Verifying..." : "Reveal & Copy"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 transition-all animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-red-500/30 p-6 shadow-2xl ring-1 ring-red-500/10">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Trash2 className="h-4 w-4 text-red-500" /> Confirm Deletion
+              </h3>
+              <button
+                onClick={() => setDeleteId(null)}
+                className="text-zinc-500 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-zinc-400 mb-4">
+              This action cannot be undone. Enter Master Admin password to
+              confirm.
+            </p>
+
+            <form onSubmit={handleConfirmDelete}>
+              <input
+                type="password"
+                autoFocus
+                placeholder="Master password..."
+                className="w-full rounded-xl border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-red-500 focus:ring-red-500 text-sm mb-4"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDeleteId(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={deleteMutation.isLoading}
+                  className="bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20"
+                >
+                  {deleteMutation.isLoading ? "Deleting..." : "Confirm Delete"}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -311,44 +493,51 @@ const Codes = () => {
       {createdCode && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 transition-all animate-in fade-in duration-300">
           <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-emerald-500/30 p-8 shadow-[0_0_50px_rgba(16,185,129,0.1)] ring-1 ring-white/10">
-             <div className="flex flex-col items-center text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
-                     <Check className="h-8 w-8" />
-                </div>
-                <h2 className="text-2xl font-bold text-white">Success!</h2>
-                <p className="mt-2 text-sm text-zinc-400">Access Key Generated Successfully.</p>
-                
-                <div className="mt-6 w-full rounded-xl border border-white/10 bg-black/40 p-4">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">Your Access Code</p>
-                    <div className="flex items-center justify-between gap-3">
-                         <code className="text-xl font-mono font-bold text-emerald-400 tracking-wider">
-                            {createdCode.code}
-                         </code>
-                         <Button 
-                           onClick={() => copyToClipboard(createdCode.code, 'created')}
-                           size="sm"
-                           className="bg-zinc-800 hover:bg-zinc-700 text-white border-white/5"
-                         >
-                            {copiedId === 'created' ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-                            {copiedId === 'created' ? 'Copied' : 'Copy'}
-                         </Button>
-                    </div>
-                </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
+                <Check className="h-8 w-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">Success!</h2>
+              <p className="mt-2 text-sm text-zinc-400">
+                Access Key Generated Successfully.
+              </p>
 
-                <div className="mt-4 text-xs text-yellow-500/80 bg-yellow-500/5 px-3 py-2 rounded-lg border border-yellow-500/10">
-                    Warning: This code is only visible once. Copy it now.
+              <div className="mt-6 w-full rounded-xl border border-white/10 bg-black/40 p-4">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Your Access Code
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <code className="text-xl font-mono font-bold text-emerald-400 tracking-wider">
+                    {createdCode.code}
+                  </code>
+                  <Button
+                    onClick={() => copyToClipboard(createdCode.code, "created")}
+                    size="sm"
+                    className="bg-zinc-800 hover:bg-zinc-700 text-white border-white/5"
+                  >
+                    {copiedId === "created" ? (
+                      <Check className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Copy className="mr-2 h-4 w-4" />
+                    )}
+                    {copiedId === "created" ? "Copied" : "Copy"}
+                  </Button>
                 </div>
+              </div>
 
-                <div className="mt-8 w-full">
-                    <Button onClick={() => setCreatedCode(null)} className="w-full">
-                        Done
-                    </Button>
-                </div>
-             </div>
+              <div className="mt-4 text-xs text-yellow-500/80 bg-yellow-500/5 px-3 py-2 rounded-lg border border-yellow-500/10">
+                Warning: This code is only visible once. Copy it now.
+              </div>
+
+              <div className="mt-8 w-full">
+                <Button onClick={() => setCreatedCode(null)} className="w-full">
+                  Done
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };
