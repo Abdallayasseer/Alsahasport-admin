@@ -498,33 +498,11 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Analytics Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2">
-          {isAnalyticsLoading ? (
-            <Skeleton className="h-[400px] w-full rounded-xl" />
-          ) : (
-            <SessionsChart data={analyticsData?.sessionsChart || []} />
-          )}
-        </div>
-        <div className="xl:col-span-1">
-          {isAnalyticsLoading ? (
-            <Skeleton className="h-[400px] w-full rounded-xl" />
-          ) : (
-            <RoleDistChart data={analyticsData?.roleDistribution || []} />
-          )}
-        </div>
-      </div>
+    
 
       {/* Activity & Details */}
       <div className="dashboard-content-grid grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 space-y-6">
-          {isAnalyticsLoading ? (
-            <Skeleton className="h-[400px] w-full rounded-xl" />
-          ) : (
-            <CodesChart data={analyticsData?.codesChart || []} />
-          )}
-        </div>
+    
         <div className="space-y-6">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
@@ -541,36 +519,6 @@ const Dashboard = () => {
               ) : (
                 recentSessions.map((session) => (
                   <LiveSessionRow key={session._id} session={session} />
-                ))
-              )}
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Lock className="w-5 h-5 text-zinc-400" /> Audit Log
-              </h3>
-            </div>
-            <div className="space-y-0 relative">
-              <div className="absolute left-[9px] top-2 bottom-2 w-[1px] bg-white/5"></div>
-              {activity.length === 0 ? (
-                <p className="text-sm text-zinc-500 text-center py-4">
-                  No recent activity
-                </p>
-              ) : (
-                activity.map((item, idx) => (
-                  <TimelineItem
-                    key={idx}
-                    title={item.title}
-                    time={item.time}
-                    status={item.status}
-                    type={item.type}
-                    details={item.details}
-                    onCopy={() => handleCopyRequest(item.id)}
-                    onDelete={() =>
-                      setDeleteModal({ isOpen: true, codeId: item.id })
-                    }
-                  />
                 ))
               )}
             </div>
