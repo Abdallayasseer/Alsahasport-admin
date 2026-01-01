@@ -29,7 +29,7 @@ export const dashboardTimeline = (scope) => {
 
   // Charts and lower content
   tl.from(
-    ".dashboard-content-grid",
+    ".dashboard-content-grid > div", // Animate children cards
     {
       y: 20,
       opacity: 0,

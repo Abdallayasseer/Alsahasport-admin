@@ -207,9 +207,11 @@ const LiveSessionRow = ({ session }) => {
       </div>
       <div className="text-right">
         <p className="text-xs text-zinc-400">
-          {formatDistanceToNow(new Date(session.lastActive), {
-            addSuffix: true,
-          })}
+          {session.lastActive
+            ? formatDistanceToNow(new Date(session.lastActive), {
+                addSuffix: true,
+              })
+            : "Unknown"}
         </p>
         {/* Confidence Indicator */}
         <div
