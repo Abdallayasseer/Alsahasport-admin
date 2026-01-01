@@ -414,15 +414,17 @@ const Dashboard = () => {
         />
         <StatCard
           title="Server Load"
-          value={`${stats.serverLoad}%`}
+          value={`${stats.serverLoad ?? 0}%`}
           icon={Server}
           gradient={
-            stats.serverLoad > 80
+            (stats.serverLoad || 0) > 80
               ? "from-red-500 to-red-600"
               : "from-emerald-500 to-emerald-600"
           }
           isLoading={isStatsLoading}
-          statusColor={stats.serverLoad > 80 ? "bg-red-500" : "bg-emerald-500"}
+          statusColor={
+            (stats.serverLoad || 0) > 80 ? "bg-red-500" : "bg-emerald-500"
+          }
         />
       </div>
 
