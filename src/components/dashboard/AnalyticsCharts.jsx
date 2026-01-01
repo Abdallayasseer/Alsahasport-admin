@@ -1,164 +1,153 @@
 import React from "react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-  PieChart,
-  Pie,
-  Legend,
-} from "recharts";
+import Chart from "react-apexcharts";
 import { Card } from "../ui/Card";
 
-const CHART_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b"];
+const commonOptions = (categories) => ({
+  chart: {
+    toolbar: { show: false },
+    background: "transparent",
+    foreColor: "#9ca3af",
+  },
+  dataLabels: { enabled: false },
+  xaxis: {
+    categories: categories || [],
+    axisBorder: { show: false },
+    axisTicks: { show: false },
+    labels: { style: { colors: "#9ca3af" } },
+  },
+  yaxis: {
+    labels: { style: { colors: "#9ca3af" } },
+  },
+  grid: {
+    show: false, 
+    borderColor: "#333",
+  },
+  tooltip: {
+    theme: "dark",
+  },
+});
 
-export const SessionsChart = ({ data }) => (
-  <Card className="p-6 flex flex-col h-[400px]">
-    <h3 className="text-lg font-bold text-white mb-4">Active Sessions (24h)</h3>
-    <div className="flex-1 w-full min-h-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={data}
-          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-        >
-          <defs>
-            <linearGradient id="colorSessions" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="#ffffff10"
-            vertical={false}
-          />
-          <XAxis
-            dataKey="time"
-            stroke="#71717a"
-            tick={{ fontSize: 12 }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            stroke="#71717a"
-            tick={{ fontSize: 12 }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "#18181b",
-              borderColor: "#27272a",
-              borderRadius: "8px",
-            }}
-            itemStyle={{ color: "#fff" }}
-          />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke="#6366f1"
-            strokeWidth={2}
-            fillOpacity={1}
-            fill="url(#colorSessions)"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  </Card>
-);
+export const SessionsChart = ({ data }) => {
+  // 1. Safety Check
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-6 h-[400px] flex items-center justify-center text-zinc-500">
+        No session data available
+      </Card>
+    );
+  }
 
-export const CodesChart = ({ data }) => (
-  <Card className="p-6 flex flex-col h-[400px]">
-    <h3 className="text-lg font-bold text-white mb-4">
-      Codes Generated (7 Days)
-    </h3>
-    <div className="flex-1 w-full min-h-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="#ffffff10"
-            vertical={false}
-          />
-          <XAxis
-            dataKey="date"
-            stroke="#71717a"
-            tick={{ fontSize: 12 }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            stroke="#71717a"
-            tick={{ fontSize: 12 }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <Tooltip
-            cursor={{ fill: "#ffffff05" }}
-            contentStyle={{
-              backgroundColor: "#18181b",
-              borderColor: "#27272a",
-              borderRadius: "8px",
-            }}
-            itemStyle={{ color: "#fff" }}
-          />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-            {data.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={CHART_COLORS[index % CHART_COLORS.length]}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </Card>
-);
+  // 2. Data Transformation (Recharts -> ApexCharts)
+  const categories = data.map((item) => item.time);
+  const seriesData = data.map((item) => item.value);
 
-export const RoleDistChart = ({ data }) => (
-  <Card className="p-6 flex flex-col h-[400px]">
-    <h3 className="text-lg font-bold text-white mb-4">Session Roles</h3>
-    <div className="flex-1 w-full min-h-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={5}
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={CHART_COLORS[index % CHART_COLORS.length]}
-                stroke="rgba(0,0,0,0)"
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "#18181b",
-              borderColor: "#27272a",
-              borderRadius: "8px",
-            }}
-            itemStyle={{ color: "#fff" }}
-          />
-          <Legend verticalAlign="bottom" height={36} />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  </Card>
-);
+  const options = {
+    ...commonOptions(categories),
+    chart: { type: "area", ...commonOptions().chart },
+    stroke: { curve: "smooth", width: 2 },
+    fill: {
+      type: "gradient",
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.4,
+        opacityTo: 0.05,
+        stops: [0, 90, 100],
+      },
+    },
+    colors: ["#6366f1"], // Indigo
+  };
+
+  const series = [{ name: "Sessions", data: seriesData }];
+
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-bold text-white mb-4">
+        Active Sessions (24h)
+      </h3>
+      <div className="w-full h-[350px]">
+        <Chart options={options} series={series} type="area" height={350} />
+      </div>
+    </Card>
+  );
+};
+
+export const CodesChart = ({ data }) => {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-6 h-[400px] flex items-center justify-center text-zinc-500">
+        No generated codes data
+      </Card>
+    );
+  }
+
+  const categories = data.map((item) => item.date);
+  const seriesData = data.map((item) => item.value);
+
+  const options = {
+    ...commonOptions(categories),
+    chart: { type: "bar", ...commonOptions().chart },
+    plotOptions: {
+      bar: { borderRadius: 4, columnWidth: "50%" },
+    },
+    colors: ["#72BF44"], // Neon Green
+  };
+
+  const series = [{ name: "Codes", data: seriesData }];
+
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-bold text-white mb-4">Codes Generated</h3>
+      <div className="w-full h-[350px]">
+        <Chart options={options} series={series} type="bar" height={350} />
+      </div>
+    </Card>
+  );
+};
+
+export const RoleDistChart = ({ data }) => {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-6 h-[400px] flex items-center justify-center text-zinc-500">
+        No role distribution data
+      </Card>
+    );
+  }
+
+  // ApexCharts Donut expects simple arrays
+  const labels = data.map((item) => item.name);
+  const series = data.map((item) => item.value);
+
+  const options = {
+    chart: { type: "donut", background: "transparent", foreColor: "#9ca3af" },
+    labels: labels,
+    colors: ["#6366f1", "#8b5cf6", "#ec4899", "#10b981"],
+    legend: { position: "bottom" },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "70%",
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total",
+              color: "#fff",
+            },
+          },
+        },
+      },
+    },
+    tooltip: { theme: "dark" },
+    dataLabels: { enabled: false },
+    stroke: { show: false },
+  };
+
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-bold text-white mb-4">Session Roles</h3>
+      <div className="w-full h-[350px]">
+        <Chart options={options} series={series} type="donut" height={350} />
+      </div>
+    </Card>
+  );
+};

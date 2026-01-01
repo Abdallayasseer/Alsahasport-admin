@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Ticket,
-  MonitorPlay,
   Users,
   LogOut,
   Menu,
@@ -31,10 +30,7 @@ const Sidebar = () => {
     { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Codes", path: "/admin/codes", icon: Ticket },
     ...(isMaster
-      ? [
-          { name: "Channels", path: "/admin/channels", icon: MonitorPlay },
-          { name: "Sessions", path: "/admin/sessions", icon: Users },
-        ]
+      ? [{ name: "Sessions", path: "/admin/sessions", icon: Users }]
       : []),
   ];
 
