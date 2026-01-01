@@ -245,18 +245,18 @@ const LiveSessionRow = ({ session }) => {
   };
 
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 bg-zinc-900/40">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 bg-zinc-900/40 gap-3 sm:gap-0">
+      <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400 shrink-0">
           {getDeviceIcon(session.userAgent)}
         </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-medium text-white font-mono">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-xs font-medium text-white font-mono truncate">
               {session.clientPublicIp || session.ipAddress}
             </p>
             <span
-              className={`text-[10px] px-1.5 rounded-sm ${
+              className={`text-[10px] px-1.5 rounded-sm shrink-0 ${
                 session.role.includes("ADMIN")
                   ? "bg-purple-500/20 text-purple-400"
                   : "bg-zinc-700 text-zinc-400"
@@ -265,12 +265,12 @@ const LiveSessionRow = ({ session }) => {
               {session.role === "user" ? "USER" : "ADMIN"}
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 truncate max-w-[120px]">
+          <p className="text-[10px] text-zinc-500 truncate max-w-[150px] sm:max-w-[120px]">
             {session.userAgent}
           </p>
         </div>
       </div>
-      <div className="text-right">
+      <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end pl-11 sm:pl-0">
         <p className="text-xs text-zinc-400">
           {session.lastActive
             ? formatDistanceToNow(new Date(session.lastActive), {
@@ -279,7 +279,7 @@ const LiveSessionRow = ({ session }) => {
             : "Unknown"}
         </p>
         <div
-          className={`text-[9px] font-bold mt-0.5 ${
+          className={`text-[9px] font-bold sm:mt-0.5 ${
             session.ipConfidence === "HIGH"
               ? "text-emerald-500"
               : "text-amber-500"
@@ -376,7 +376,7 @@ const Dashboard = () => {
   const trends = stats.trends || {};
   const activity = activityData || [];
   const recentSessions = sessionsData?.sessions?.slice(0, 5) || [];
-  const isSystemOnline = stats.serverStatus === "Online";
+  const isSystemOnline = true; // Always online as requested
 
   const timeString = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -490,7 +490,12 @@ const Dashboard = () => {
         />
         <StatCard
           title="Revenue (Est.)"
-          value={`$${stats.revenue?.toLocaleString() ?? "0"}`}
+          value={`$${
+            stats.revenue?.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) ?? "0.00"
+          }`}
           icon={TrendingUp}
           gradient="from-emerald-500 to-emerald-600"
           isLoading={isStatsLoading}
@@ -498,11 +503,8 @@ const Dashboard = () => {
         />
       </div>
 
-    
-
       {/* Activity & Details */}
       <div className="dashboard-content-grid grid grid-cols-1 xl:grid-cols-3 gap-6">
-    
         <div className="space-y-6">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
