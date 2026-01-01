@@ -135,7 +135,9 @@ const TimelineItem = React.memo(
           <h4 className="text-sm font-medium text-zinc-200">{title}</h4>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-500">
             <span>
-              {formatDistanceToNow(new Date(time), { addSuffix: true })}
+              {time
+                ? formatDistanceToNow(new Date(time), { addSuffix: true })
+                : "Unknown time"}
             </span>
             {details && (
               <>
@@ -443,7 +445,7 @@ const Dashboard = () => {
       </div>
 
       {/* 4. Activity & Live Details */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="dashboard-content-grid grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Recent Pages/Activity */}
         <div className="xl:col-span-2 space-y-6">
           {isAnalyticsLoading ? (
