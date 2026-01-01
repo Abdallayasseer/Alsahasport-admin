@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import api from "../api/axios";
 import { useAuth } from "../context/useAuth";
 import { Card } from "../components/ui/Card";
 import { Skeleton } from "../components/ui/Skeleton";
+import PasswordConfirmationModal from "../components/modals/PasswordConfirmationModal";
+import {
+  SessionsChart,
+  CodesChart,
+  RoleDistChart,
+} from "../components/dashboard/AnalyticsCharts";
 import {
   Users,
   Server,
@@ -12,21 +18,24 @@ import {
   TrendingUp,
   Activity,
   Copy,
+  Tv,
+  BarChart,
+  Trash2,
   Lock,
-  X,
-  Loader2,
+  Smartphone,
+  Globe,
+  Monitor,
 } from "lucide-react";
-import { Button } from "../components/ui/Button";
 
 // GSAP Imports
 import { useGSAP } from "@gsap/react";
 import { dashboardTimeline } from "../animations/dashboardAnimations";
 import { animateCardHover } from "../animations/commonAnimations";
+import { formatDistanceToNow } from "date-fns";
 
 const StatCard = React.memo(
-  ({ title, value, change, gradient, icon: Icon, isLoading }) => {
+  ({ title, value, change, gradient, icon: Icon, isLoading, statusColor }) => {
     const cardRef = useRef(null);
-
     const { contextSafe } = useGSAP({ scope: cardRef });
 
     const handleMouseEnter = contextSafe((e) => {
@@ -43,7 +52,6 @@ const StatCard = React.memo(
           <Card className="relative overflow-hidden h-full p-6 flex flex-col justify-between gap-4 border-white/5 bg-zinc-900/50">
             <div className="flex justify-between items-start">
               <Skeleton className="h-10 w-10 rounded-xl" />
-              <Skeleton className="h-24 w-24 rounded-full opacity-5 absolute -right-4 -top-4" />
             </div>
             <div className="space-y-2">
               <Skeleton className="h-8 w-24" />
@@ -62,31 +70,46 @@ const StatCard = React.memo(
         className="stat-card"
       >
         <Card className="relative overflow-hidden group hover:border-white/20 transition-colors duration-300 h-full">
+          {/* Subtle Background Gradient */}
           <div
-            className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${gradient} bg-clip-text text-transparent`}
-          >
-            <Icon className="w-24 h-24 -mr-4 -mt-4 transform rotate-12" />
-          </div>
+            className={`absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-0 group-hover:opacity-10 transition-opacity blur-2xl bg-gradient-to-br ${gradient}`}
+          />
 
-          <div className="relative z-10 flex flex-col h-full justify-between">
-            <div>
-              <div
-                className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${gradient} bg-opacity-10 mb-4 shadow-lg shadow-black/20 ring-1 ring-white/5`}
-              >
-                <Icon className="w-6 h-6 text-white" />
+          <div className="relative z-10 flex flex-col h-full justify-between p-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-zinc-400">{title}</p>
+                <h3 className="text-3xl font-bold text-white tracking-tight">
+                  {value}
+                </h3>
               </div>
-              <h3 className="text-3xl font-bold text-white tracking-tight mb-1">
-                {value}
-              </h3>
-              <p className="text-sm font-medium text-zinc-400">{title}</p>
+              <div
+                className={`inline-flex p-2.5 rounded-xl bg-gradient-to-br ${gradient} bg-opacity-10 shadow-lg ring-1 ring-white/5`}
+              >
+                <Icon className="w-5 h-5 text-white" />
+              </div>
             </div>
 
-            <div className="mt-4 flex items-center text-xs font-medium">
-              <span className="text-emerald-400 flex items-center bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                {change}
-              </span>
-              <span className="ml-auto text-zinc-600">vs last week</span>
+            <div className="mt-4 flex items-center justify-between text-xs font-medium">
+              {statusColor ? (
+                <span
+                  className={`flex items-center gap-2 ${statusColor.replace(
+                    "bg-",
+                    "text-"
+                  )}`}
+                >
+                  <span
+                    className={`flex h-2 w-2 rounded-full ${statusColor} shadow-[0_0_8px_currentColor]`}
+                  />
+                  {value}
+                </span>
+              ) : change ? (
+                <span className="text-emerald-400 flex items-center bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                  <TrendingUp className="w-3 h-3 mr-1" />+{change}% vs yesterday
+                </span>
+              ) : (
+                <span className="text-zinc-500">No change</span>
+              )}
             </div>
           </div>
         </Card>
@@ -96,11 +119,10 @@ const StatCard = React.memo(
 );
 
 const TimelineItem = React.memo(
-  ({ title, time, status, type, details, onCopy }) => (
+  ({ title, time, status, type, details, onCopy, onDelete }) => (
     <div className="relative pl-6 pb-6 border-l border-white/5 last:pb-0 group/item">
-      {/* ... TimelineItem content remains same ... */}
       <div
-        className={`absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-950 ${
+        className={`absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-950 ${
           status === "success"
             ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
             : status === "warning"
@@ -111,39 +133,110 @@ const TimelineItem = React.memo(
       <div className="flex justify-between items-start">
         <div>
           <h4 className="text-sm font-medium text-zinc-200">{title}</h4>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-zinc-500 font-mono">{time}</span>
+          <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-500">
+            <span>
+              {formatDistanceToNow(new Date(time), { addSuffix: true })}
+            </span>
             {details && (
               <>
-                <span className="text-zinc-700">•</span>
-                <span className="text-xs text-zinc-400">{details}</span>
+                <span className="text-zinc-600">•</span>
+                <span className="text-zinc-400">{details}</span>
               </>
             )}
           </div>
         </div>
-        {type === "CODE_CREATED" && (
-          <button
-            onClick={onCopy}
-            className="opacity-0 group-hover/item:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-white/10 text-zinc-400 hover:text-white"
-            title="Reveal & Copy Code"
-          >
-            <Copy className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+          {type === "CODE_CREATED" && (
+            <>
+              <button
+                onClick={onCopy}
+                className="p-1.5 rounded-md hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+                title="Reveal & Copy Code"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onDelete}
+                className="p-1.5 rounded-md hover:bg-red-500/10 text-zinc-400 hover:text-red-400 transition-colors"
+                title="Delete Code"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
 );
 
-// Removed PasswordConfirmationModal import
+const LiveSessionRow = ({ session }) => {
+  const getDeviceIcon = (ua) => {
+    if (!ua) return <Globe className="h-4 w-4 text-zinc-500" />;
+    const lower = ua.toLowerCase();
+    if (lower.includes("mobile") || lower.includes("android"))
+      return <Smartphone className="h-4 w-4 text-indigo-400" />;
+    return <Monitor className="h-4 w-4 text-purple-400" />;
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 bg-zinc-900/40">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
+          {getDeviceIcon(session.userAgent)}
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-medium text-white font-mono">
+              {session.clientPublicIp || session.ipAddress}
+            </p>
+            <span
+              className={`text-[10px] px-1.5 rounded-sm ${
+                session.role.includes("ADMIN")
+                  ? "bg-purple-500/20 text-purple-400"
+                  : "bg-zinc-700 text-zinc-400"
+              }`}
+            >
+              {session.role === "user" ? "USER" : "ADMIN"}
+            </span>
+          </div>
+          <p className="text-[10px] text-zinc-500 truncate max-w-[120px]">
+            {session.userAgent}
+          </p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-xs text-zinc-400">
+          {formatDistanceToNow(new Date(session.lastActive), {
+            addSuffix: true,
+          })}
+        </p>
+        {/* Confidence Indicator */}
+        <div
+          className={`text-[9px] font-bold mt-0.5 ${
+            session.ipConfidence === "HIGH"
+              ? "text-emerald-500"
+              : "text-amber-500"
+          }`}
+        >
+          {session.ipConfidence} CONF.
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [date, setDate] = useState(new Date());
   const containerRef = useRef(null);
+  const queryClient = useQueryClient();
 
   // Modal State
-  const [isRevealing, setIsRevealing] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    codeId: null,
+  });
 
   // Initialize Dashboard Animations
   useGSAP(
@@ -158,68 +251,47 @@ const Dashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // 0. System Status
+  // 1. System Status
   const { data: statusData } = useQuery({
     queryKey: ["system", "status"],
-    queryFn: async () => {
-      const { data } = await api.get("/admin/system/status");
-      return data.data;
-    },
+    queryFn: async () => (await api.get("/admin/system/status")).data.data,
     refetchInterval: 30000,
   });
 
-  // Calculate system status safely
   const isSystemOnline = statusData?.status === "online";
 
-  // 1. Fetch Stats
+  // 2. Fetch Stats (With Trends)
   const { data: statsData, isLoading: isStatsLoading } = useQuery({
     queryKey: ["admin", "stats"],
-    queryFn: async () => {
-      const { data } = await api.get("/admin/stats");
-      return data.data;
-    },
+    queryFn: async () => (await api.get("/admin/stats")).data.data,
     refetchInterval: 30000,
-  });
-
-  // 2. Fetch Weekly Stats
-  const { data: weeklyData } = useQuery({
-    queryKey: ["admin", "stats", "weekly"],
-    queryFn: async () => {
-      const { data } = await api.get("/admin/stats/weekly");
-      return data.data;
-    },
   });
 
   // 3. Fetch Activity
   const { data: activityData } = useQuery({
     queryKey: ["admin", "activity"],
-    queryFn: async () => {
-      const { data } = await api.get("/admin/activity");
-      return data.data;
-    },
+    queryFn: async () => (await api.get("/admin/activity")).data.data,
     refetchInterval: 15000,
   });
 
-  const stats = statsData || {
-    totalCodes: 0,
-    activeSessions: 0,
-    serverLoad: 0,
-    revenue: 0,
-  };
-  const weeklyStats = weeklyData || [];
-  const activity = activityData || [];
-
-  // Normalize weekly data for chart (ensure all 7 days exist)
-  const chartData = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dateStr = d.toISOString().split("T")[0];
-    const found = weeklyStats.find((s) => s._id === dateStr);
-    return {
-      day: d.toLocaleDateString("en-US", { weekday: "short" }),
-      value: found ? found.count : 0,
-    };
+  // 4. Fetch Analytics (New Endpoint)
+  const { data: analyticsData, isLoading: isAnalyticsLoading } = useQuery({
+    queryKey: ["admin", "analytics"],
+    queryFn: async () => (await api.get("/admin/analytics")).data.data,
+    refetchInterval: 60000, // Cached longer
   });
+
+  // 5. Fetch Live Sessions Preview
+  const { data: sessionsData } = useQuery({
+    queryKey: ["sessions", "live"],
+    queryFn: async () => (await api.get("/admin/sessions/live")).data.data,
+    refetchInterval: 10000,
+  });
+
+  const stats = statsData || {};
+  const trends = stats.trends || {};
+  const activity = activityData || [];
+  const recentSessions = sessionsData?.sessions?.slice(0, 5) || [];
 
   const timeString = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -235,30 +307,33 @@ const Dashboard = () => {
 
   // Handlers
   const handleCopyRequest = async (codeId) => {
-    // Immediate Reveal
     try {
-      setIsRevealing(true);
       const { data } = await api.post(`/admin/codes/${codeId}/reveal`);
       if (data.success && data.data?.code) {
         await navigator.clipboard.writeText(data.data.code);
-        toast.success("Code copied to clipboard", {
-          icon: "📋",
-          style: {
-            borderRadius: "10px",
-            background: "#333",
-            color: "#fff",
-          },
-        });
+        toast.success("Code copied to clipboard");
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to reveal code");
-    } finally {
-      setIsRevealing(false);
+    }
+  };
+
+  const confirmDelete = async (password, setError) => {
+    try {
+      await api.post("/admin/verify-master-password", { password });
+      await api.delete(`/admin/codes/${deleteModal.codeId}`);
+      toast.success("Code deleted successfully");
+      setDeleteModal({ isOpen: false, codeId: null });
+      queryClient.invalidateQueries(["admin", "activity"]);
+      queryClient.invalidateQueries(["admin", "stats"]);
+      queryClient.invalidateQueries(["admin", "analytics"]);
+    } catch (err) {
+      setError(err.response?.data?.message || "Verification failed");
     }
   };
 
   return (
-    <div ref={containerRef} className="space-y-8 max-w-7xl mx-auto">
+    <div ref={containerRef} className="space-y-8 max-w-[1600px] mx-auto pb-10">
       {/* Header Section */}
       <div className="dashboard-header flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-white/5">
         <div>
@@ -282,17 +357,22 @@ const Dashboard = () => {
             {isSystemOnline ? "System Online" : "System Offline"}
           </div>
           <h1 className="text-4xl font-bold text-white tracking-tight">
-            Welcome back,{" "}
+            Good{" "}
+            {date.getHours() < 12
+              ? "Morning"
+              : date.getHours() < 18
+              ? "Afternoon"
+              : "Evening"}
+            ,{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">
               {user?.username || "Admin"}
             </span>
           </h1>
           <p className="mt-2 text-zinc-400 max-w-xl">
-            Here's what's happening in your workspace today. Server load is
-            stable and user activity is trending up.
+            Here is what's happening in your application today.
           </p>
         </div>
-        <div className="text-right">
+        <div className="text-right hidden md:block">
           <div className="text-4xl font-light text-white tracking-tighter">
             {timeString}
           </div>
@@ -302,122 +382,143 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 2. Key Metrics Grid (4 Columns) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard
-          title="Total Generated Codes"
-          value={stats?.totalCodes?.toLocaleString() ?? "0"}
-          change="+12%" // TODO: Implement calculate change
-          icon={Ticket}
-          gradient="from-indigo-500 to-blue-600"
+          title="Total Users"
+          value={stats.totalUsers?.toLocaleString() ?? "0"}
+          icon={Users}
+          gradient="from-indigo-500 to-indigo-600"
           isLoading={isStatsLoading}
+          change={trends.users}
         />
         <StatCard
           title="Active Sessions"
-          value={stats?.activeSessions?.toLocaleString() ?? "0"}
-          change="+5%"
-          icon={Users}
+          value={stats.activeSessions?.toLocaleString() ?? "0"}
+          icon={Activity}
           gradient="from-violet-500 to-fuchsia-600"
           isLoading={isStatsLoading}
+          change={trends.sessions}
+        />
+        <StatCard
+          title="Total Codes"
+          value={stats.totalCodes?.toLocaleString() ?? "0"}
+          icon={Ticket}
+          gradient="from-blue-500 to-cyan-600"
+          isLoading={isStatsLoading}
+          change={trends.codes}
         />
         <StatCard
           title="Server Load"
-          value={`${stats?.serverLoad ?? 0}%`}
-          change="-2%"
+          value={`${stats.serverLoad}%`}
           icon={Server}
-          gradient="from-emerald-500 to-teal-600"
+          gradient={
+            stats.serverLoad > 80
+              ? "from-red-500 to-red-600"
+              : "from-emerald-500 to-emerald-600"
+          }
           isLoading={isStatsLoading}
-        />
-        <StatCard
-          title="Est. Revenue"
-          value={`$${stats?.revenue?.toLocaleString() ?? "0"}`}
-          change="+8%"
-          icon={TrendingUp}
-          gradient="from-amber-500 to-orange-600"
-          isLoading={isStatsLoading}
+          statusColor={stats.serverLoad > 80 ? "bg-red-500" : "bg-emerald-500"}
         />
       </div>
 
-      {/* Recent Activity Area */}
-      <div className="dashboard-content-grid grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chart */}
-        <Card className="lg:col-span-2 min-h-[400px] flex flex-col">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h3 className="text-lg font-bold text-white">
-                Weekly Code Generation
+      {/* 3. Analytics Charts Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2">
+          {isAnalyticsLoading ? (
+            <Skeleton className="h-[400px] w-full rounded-xl" />
+          ) : (
+            <SessionsChart data={analyticsData?.sessionsChart || []} />
+          )}
+        </div>
+        <div className="xl:col-span-1">
+          {isAnalyticsLoading ? (
+            <Skeleton className="h-[400px] w-full rounded-xl" />
+          ) : (
+            <RoleDistChart data={analyticsData?.roleDistribution || []} />
+          )}
+        </div>
+      </div>
+
+      {/* 4. Activity & Live Details */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Recent Pages/Activity */}
+        <div className="xl:col-span-2 space-y-6">
+          {isAnalyticsLoading ? (
+            <Skeleton className="h-[400px] w-full rounded-xl" />
+          ) : (
+            <CodesChart data={analyticsData?.codesChart || []} />
+          )}
+        </div>
+
+        {/* Right Column: Live Feed & Activity */}
+        <div className="space-y-6">
+          {/* Live Sessions Preview */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-400" />
+                Live Activity
               </h3>
-              <p className="text-sm text-zinc-500">
-                Performance metrics over the last 7 days
-              </p>
+              <span className="text-xs text-zinc-500">Real-time</span>
             </div>
-          </div>
+            <div className="space-y-3">
+              {recentSessions.length === 0 ? (
+                <p className="text-sm text-zinc-500 text-center py-4">
+                  No active sessions
+                </p>
+              ) : (
+                recentSessions.map((session) => (
+                  <LiveSessionRow key={session._id} session={session} />
+                ))
+              )}
+            </div>
+          </Card>
 
-          <div className="flex-1 flex items-end justify-between gap-2 px-4 pb-4">
-            {chartData.map((d, i) => (
-              <div
-                key={i}
-                className="w-full bg-zinc-800/50 rounded-t-lg relative group h-full flex flex-col justify-end"
-              >
-                <div
-                  className="w-full bg-gradient-to-t from-indigo-600/20 to-indigo-500/80 rounded-t-lg transition-all duration-500 group-hover:to-violet-500 relative"
-                  style={{
-                    height: `${
-                      d.value > 0
-                        ? (d.value /
-                            Math.max(...chartData.map((c) => c.value), 10)) *
-                          100
-                        : 5
-                    }%`,
-                  }}
-                >
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-900 px-2 py-1 rounded border border-white/10">
-                    {d.value}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between px-4 mt-2 text-xs text-zinc-500 font-mono uppercase">
-            {chartData.map((d, i) => (
-              <span key={i}>{d.day}</span>
-            ))}
-          </div>
-        </Card>
-
-        {/* Timeline */}
-        <Card className="flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-indigo-400" />
-              Recent Actions
-            </h3>
-          </div>
-
-          <div className="space-y-1 overflow-y-auto max-h-[320px] scrollbar-thin scrollbar-thumb-zinc-800">
-            {activity.length === 0 ? (
-              <div className="text-zinc-500 text-sm py-4 text-center">
-                No recent activity
-              </div>
-            ) : (
-              activity.map((item, idx) => (
-                <TimelineItem
-                  key={idx}
-                  title={item.title}
-                  time={new Date(item.time).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                  status={item.status}
-                  type={item.type}
-                  details={item.details}
-                  onCopy={() => handleCopyRequest(item.id)}
-                />
-              ))
-            )}
-          </div>
-        </Card>
+          {/* Audit Log */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Lock className="w-5 h-5 text-zinc-400" />
+                Audit Log
+              </h3>
+            </div>
+            <div className="space-y-0 relative">
+              <div className="absolute left-[9px] top-2 bottom-2 w-[1px] bg-white/5"></div>
+              {activity.length === 0 ? (
+                <p className="text-sm text-zinc-500 text-center py-4">
+                  No recent activity
+                </p>
+              ) : (
+                activity.map((item, idx) => (
+                  <TimelineItem
+                    key={idx}
+                    title={item.title}
+                    time={item.time}
+                    status={item.status}
+                    type={item.type}
+                    details={item.details}
+                    onCopy={() => handleCopyRequest(item.id)}
+                    onDelete={() =>
+                      setDeleteModal({ isOpen: true, codeId: item.id })
+                    }
+                  />
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <PasswordConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, codeId: null })}
+        onConfirm={confirmDelete}
+        title="Confirm Deletion"
+        description="This action cannot be undone. Please enter your master password to confirm deletion."
+        variant="danger"
+      />
     </div>
   );
 };
