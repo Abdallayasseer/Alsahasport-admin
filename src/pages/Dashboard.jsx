@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import api from "../api/axios";
@@ -20,211 +20,122 @@ import { Button } from "../components/ui/Button";
 
 // GSAP Imports
 import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { dashboardTimeline } from "../animations/dashboardAnimations";
 import { animateCardHover } from "../animations/commonAnimations";
 
-const StatCard = ({
-  title,
-  value,
-  change,
-  gradient,
-  icon: Icon,
-  isLoading,
-}) => {
-  const cardRef = useRef(null);
+const StatCard = React.memo(
+  ({ title, value, change, gradient, icon: Icon, isLoading }) => {
+    const cardRef = useRef(null);
 
-  const { contextSafe } = useGSAP({ scope: cardRef });
+    const { contextSafe } = useGSAP({ scope: cardRef });
 
-  const handleMouseEnter = contextSafe(() => {
-    !isLoading && animateCardHover(cardRef.current, true);
-  });
+    const handleMouseEnter = contextSafe((e) => {
+      !isLoading && animateCardHover(e.currentTarget, true);
+    });
 
-  const handleMouseLeave = contextSafe(() => {
-    !isLoading && animateCardHover(cardRef.current, false);
-  });
+    const handleMouseLeave = contextSafe((e) => {
+      !isLoading && animateCardHover(e.currentTarget, false);
+    });
 
-  if (isLoading) {
+    if (isLoading) {
+      return (
+        <div className="stat-card h-full">
+          <Card className="relative overflow-hidden h-full p-6 flex flex-col justify-between gap-4 border-white/5 bg-zinc-900/50">
+            <div className="flex justify-between items-start">
+              <Skeleton className="h-10 w-10 rounded-xl" />
+              <Skeleton className="h-24 w-24 rounded-full opacity-5 absolute -right-4 -top-4" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </Card>
+        </div>
+      );
+    }
+
     return (
-      <div className="stat-card h-full">
-        <Card className="relative overflow-hidden h-full p-6 flex flex-col justify-between gap-4 border-white/5 bg-zinc-900/50">
-          <div className="flex justify-between items-start">
-            <Skeleton className="h-10 w-10 rounded-xl" />
-            <Skeleton className="h-24 w-24 rounded-full opacity-5 absolute -right-4 -top-4" />
+      <div
+        ref={cardRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="stat-card"
+      >
+        <Card className="relative overflow-hidden group hover:border-white/20 transition-colors duration-300 h-full">
+          <div
+            className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${gradient} bg-clip-text text-transparent`}
+          >
+            <Icon className="w-24 h-24 -mr-4 -mt-4 transform rotate-12" />
           </div>
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-24" />
-            <Skeleton className="h-4 w-32" />
+
+          <div className="relative z-10 flex flex-col h-full justify-between">
+            <div>
+              <div
+                className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${gradient} bg-opacity-10 mb-4 shadow-lg shadow-black/20 ring-1 ring-white/5`}
+              >
+                <Icon className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-3xl font-bold text-white tracking-tight mb-1">
+                {value}
+              </h3>
+              <p className="text-sm font-medium text-zinc-400">{title}</p>
+            </div>
+
+            <div className="mt-4 flex items-center text-xs font-medium">
+              <span className="text-emerald-400 flex items-center bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                <TrendingUp className="w-3 h-3 mr-1" />
+                {change}
+              </span>
+              <span className="ml-auto text-zinc-600">vs last week</span>
+            </div>
           </div>
         </Card>
       </div>
     );
   }
-
-  return (
-    <div
-      ref={cardRef}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className="stat-card"
-    >
-      <Card className="relative overflow-hidden group hover:border-white/20 transition-colors duration-300 h-full">
-        <div
-          className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${gradient} bg-clip-text text-transparent`}
-        >
-          <Icon className="w-24 h-24 -mr-4 -mt-4 transform rotate-12" />
-        </div>
-
-        <div className="relative z-10 flex flex-col h-full justify-between">
-          <div>
-            <div
-              className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${gradient} bg-opacity-10 mb-4 shadow-lg shadow-black/20 ring-1 ring-white/5`}
-            >
-              <Icon className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="text-3xl font-bold text-white tracking-tight mb-1">
-              {value}
-            </h3>
-            <p className="text-sm font-medium text-zinc-400">{title}</p>
-          </div>
-
-          <div className="mt-4 flex items-center text-xs font-medium">
-            <span className="text-emerald-400 flex items-center bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              {change}
-            </span>
-            <span className="ml-auto text-zinc-600">vs last week</span>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
-const TimelineItem = ({ title, time, status, type, details, onCopy }) => (
-  <div className="relative pl-6 pb-6 border-l border-white/5 last:pb-0 group/item">
-    {/* ... TimelineItem content remains same ... */}
-    <div
-      className={`absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-950 ${
-        status === "success"
-          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-          : status === "warning"
-          ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-          : "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
-      }`}
-    />
-    <div className="flex justify-between items-start">
-      <div>
-        <h4 className="text-sm font-medium text-zinc-200">{title}</h4>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-zinc-500 font-mono">{time}</span>
-          {details && (
-            <>
-              <span className="text-zinc-700">•</span>
-              <span className="text-xs text-zinc-400">{details}</span>
-            </>
-          )}
-        </div>
-      </div>
-      {type === "CODE_CREATED" && (
-        <button
-          onClick={onCopy}
-          className="opacity-0 group-hover/item:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-white/10 text-zinc-400 hover:text-white"
-          title="Reveal & Copy Code"
-        >
-          <Copy className="w-3.5 h-3.5" />
-        </button>
-      )}
-    </div>
-  </div>
 );
 
-const PasswordModal = ({ isOpen, onClose, onConfirm, isLoading }) => {
-  // ... PasswordModal implementation remains same ...
-  const [password, setPassword] = useState("");
-  const modalRef = useRef(null);
-
-  useGSAP(() => {
-    if (isOpen) {
-      gsap.from(modalRef.current, {
-        scale: 0.9,
-        opacity: 0,
-        duration: 0.3,
-        ease: "back.out(1.7)",
-      });
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onConfirm(password);
-    setPassword("");
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+const TimelineItem = React.memo(
+  ({ title, time, status, type, details, onCopy }) => (
+    <div className="relative pl-6 pb-6 border-l border-white/5 last:pb-0 group/item">
+      {/* ... TimelineItem content remains same ... */}
       <div
-        ref={modalRef}
-        className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-xl shadow-2xl p-6 relative"
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-zinc-500 hover:text-white"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="flex flex-col items-center mb-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4 ring-1 ring-indigo-500/20">
-            <Lock className="w-6 h-6 text-indigo-400" />
+        className={`absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-950 ${
+          status === "success"
+            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+            : status === "warning"
+            ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+            : "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
+        }`}
+      />
+      <div className="flex justify-between items-start">
+        <div>
+          <h4 className="text-sm font-medium text-zinc-200">{title}</h4>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs text-zinc-500 font-mono">{time}</span>
+            {details && (
+              <>
+                <span className="text-zinc-700">•</span>
+                <span className="text-xs text-zinc-400">{details}</span>
+              </>
+            )}
           </div>
-          <h3 className="text-xl font-bold text-white">Security Check</h3>
-          <p className="text-sm text-zinc-400 mt-1">
-            Please enter your admin password to reveal and copy this activation
-            code.
-          </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <input
-              type="password"
-              placeholder="Admin Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-950/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-sm"
-              autoFocus
-            />
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="w-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white"
-              disabled={!password || isLoading}
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Reveal Code"
-              )}
-            </Button>
-          </div>
-        </form>
+        {type === "CODE_CREATED" && (
+          <button
+            onClick={onCopy}
+            className="opacity-0 group-hover/item:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-white/10 text-zinc-400 hover:text-white"
+            title="Reveal & Copy Code"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
-  );
-};
+  )
+);
+
+// Removed PasswordConfirmationModal import
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -232,8 +143,6 @@ const Dashboard = () => {
   const containerRef = useRef(null);
 
   // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedCodeId, setSelectedCodeId] = useState(null);
   const [isRevealing, setIsRevealing] = useState(false);
 
   // Initialize Dashboard Animations
@@ -250,7 +159,7 @@ const Dashboard = () => {
   }, []);
 
   // 0. System Status
-  const { data: statusData, isLoading: isStatusLoading } = useQuery({
+  const { data: statusData } = useQuery({
     queryKey: ["system", "status"],
     queryFn: async () => {
       const { data } = await api.get("/admin/system/status");
@@ -325,19 +234,11 @@ const Dashboard = () => {
   }).format(date);
 
   // Handlers
-  const handleCopyRequest = (codeId) => {
-    setSelectedCodeId(codeId);
-    setIsModalOpen(true);
-  };
-
-  const handleRevealConfirm = async (password) => {
-    if (!selectedCodeId) return;
-
-    setIsRevealing(true);
+  const handleCopyRequest = async (codeId) => {
+    // Immediate Reveal
     try {
-      const { data } = await api.post(`/admin/codes/${selectedCodeId}/reveal`, {
-        password,
-      });
+      setIsRevealing(true);
+      const { data } = await api.post(`/admin/codes/${codeId}/reveal`);
       if (data.success && data.data?.code) {
         await navigator.clipboard.writeText(data.data.code);
         toast.success("Code copied to clipboard", {
@@ -348,7 +249,6 @@ const Dashboard = () => {
             color: "#fff",
           },
         });
-        setIsModalOpen(false);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to reveal code");
@@ -359,13 +259,6 @@ const Dashboard = () => {
 
   return (
     <div ref={containerRef} className="space-y-8 max-w-7xl mx-auto">
-      <PasswordModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onConfirm={handleRevealConfirm}
-        isLoading={isRevealing}
-      />
-
       {/* Header Section */}
       <div className="dashboard-header flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-white/5">
         <div>

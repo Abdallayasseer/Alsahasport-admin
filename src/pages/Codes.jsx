@@ -22,6 +22,8 @@ import toast from "react-hot-toast";
 import api from "../api/axios";
 import RoleGuard from "../components/guard/RoleGuard";
 import { Button } from "../components/ui/Button";
+import PasswordConfirmationModal from "../components/modals/PasswordConfirmationModal";
+// Removed duplicate import
 
 // --- API Functions ---
 const fetchCodes = async (page = 1, limit = 10, search = "") => {
@@ -36,13 +38,7 @@ const createCode = async (codeData) => {
   return data;
 };
 
-/* New Verification Function */
-const verifyPassword = async (password) => {
-  const { data } = await api.post("/admin/verify-master-password", {
-    password,
-  });
-  return data.success;
-};
+// Removed verifyPassword function
 
 // --- Validation ---
 const codeSchema = z.object({
@@ -52,17 +48,21 @@ const codeSchema = z.object({
 
 const Codes = () => {
   const [search, setSearch] = useState("");
-  /* New State for Delete Confirmation */
-  const [deleteId, setDeleteId] = useState(null);
-  const [deletePassword, setDeletePassword] = useState("");
+  // Security Verification State
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    type: null, // 'DELETE' | 'REVEAL'
+    data: null, // { id: string }
+    title: "",
+    description: "",
+  });
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createdCode, setCreatedCode] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
   // Reveal Logic State
-  const [revealId, setRevealId] = useState(null);
-  const [revealPassword, setRevealPassword] = useState("");
   const [isRevealing, setIsRevealing] = useState(false);
 
   const queryClient = useQueryClient();
@@ -93,36 +93,71 @@ const Codes = () => {
     },
   });
 
-  /* Updated Delete Mutation with Two-Step Verification */
+  /* Updated Delete Mutation (Direct Delete) */
   const deleteMutation = useMutation({
-    mutationFn: async ({ id, password }) => {
-      // Step 1: Verify Password explicitly (as requested)
-      await verifyPassword(password);
-      // Step 2: Proceed with Delete (passing password again for backend security)
-      await api.delete(`/admin/codes/${id}`, { data: { password } });
+    mutationFn: async (id) => {
+      // Step 1: Proceed with Delete (no password)
+      await api.delete(`/admin/codes/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["codes"]);
       toast.success("Code deleted successfully");
-      setDeleteId(null);
-      setDeletePassword("");
     },
     onError: (err) => {
-      // Handle "Incorrect password" specifically
       const msg = err.response?.data?.message || "Failed to delete code";
       toast.error(msg);
-      // We do not logout (handled by axios interceptor fix), allows retry
     },
   });
 
   const handleDeleteClick = (id) => {
-    setDeleteId(id);
+    setConfirmModal({
+      isOpen: true,
+      type: "DELETE",
+      data: { id },
+      title: "Delete Activation Code",
+      description:
+        "You are about to permanently delete this activation code. This action requires Master Admin authentication.",
+    });
   };
 
-  const handleConfirmDelete = async (e) => {
-    e.preventDefault();
-    if (!deletePassword) return toast.error("Password required");
-    deleteMutation.mutate({ id: deleteId, password: deletePassword });
+  const handleRevealClick = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      type: "REVEAL",
+      data: { id },
+      title: "Reveal & Copy Code",
+      description:
+        "You are viewing a hidden security code. Please confirm your Master Admin password to reveal and copy it.",
+    });
+  };
+
+  const handlePasswordVerified = async (password, setModalError) => {
+    setIsVerifying(true);
+    try {
+      // 1. Verify Password with Backend
+      await api.post("/admin/verify-master-password", { password });
+
+      // 2. Perform Action based on Type
+      if (confirmModal.type === "DELETE") {
+        await deleteMutation.mutateAsync(confirmModal.data.id);
+        setConfirmModal({ ...confirmModal, isOpen: false });
+      } else if (confirmModal.type === "REVEAL") {
+        await executeReveal(confirmModal.data.id);
+        setConfirmModal({ ...confirmModal, isOpen: false });
+      }
+    } catch (err) {
+      console.error(err);
+      const isAuthError = err.response?.status === 401;
+
+      if (isAuthError) {
+        setModalError("Incorrect Master Admin password");
+        // Do NOT close modal
+      } else {
+        setModalError(err.response?.data?.message || "Something went wrong");
+      }
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const copyToClipboard = async (text, id = null) => {
@@ -152,27 +187,15 @@ const Codes = () => {
     reset();
   };
 
-  const handleReveal = async (e) => {
-    e.preventDefault();
-    if (!revealPassword) return toast.error("Password required");
-
+  const executeReveal = async (id) => {
     setIsRevealing(true);
     try {
-      // Step 1: Verify Password explicitly
-      await verifyPassword(revealPassword);
-
-      // Step 2: Reveal & Copy (Passing password again as required by backend reveal endpoint)
-      const { data } = await api.post(`/admin/codes/${revealId}/reveal`, {
-        password: revealPassword,
-      });
+      // Step 2: Reveal & Copy (Direct)
+      const { data } = await api.post(`/admin/codes/${id}/reveal`);
       await navigator.clipboard.writeText(data.data.code);
       toast.success("Code copied successfully");
-      setRevealId(null);
-      setRevealPassword("");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Verification failed");
-      // Clear password on failure as requested
-      setRevealPassword("");
+      toast.error(err.response?.data?.message || "Reveal failed");
     } finally {
       setIsRevealing(false);
     }
@@ -268,9 +291,9 @@ const Codes = () => {
                             ...{code._id.slice(-6)}
                           </div>
                           <button
-                            onClick={() => setRevealId(code._id)}
+                            onClick={() => handleRevealClick(code._id)}
                             className="ml-2 rounded-md p-1 hover:bg-white/10 text-zinc-500 hover:text-white transition-all focus:outline-none"
-                            title="Copy Code (Secure)"
+                            title="Copy Code"
                           >
                             <Copy className="h-3 w-3" />
                           </button>
@@ -386,108 +409,14 @@ const Codes = () => {
         </div>
       )}
 
-      {/* Verify Password Modal (Reveal) */}
-      {revealId && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 transition-all animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-white/10 p-6 shadow-2xl ring-1 ring-white/10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Lock className="h-4 w-4 text-indigo-400" /> Security Check
-              </h3>
-              <button
-                onClick={() => setRevealId(null)}
-                className="text-zinc-500 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <p className="text-sm text-zinc-400 mb-4">
-              Enter master password to reveal and copy code.
-            </p>
-
-            <form onSubmit={handleReveal}>
-              <input
-                type="password"
-                autoFocus
-                placeholder="Enter password..."
-                className="w-full rounded-xl border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500 text-sm mb-4"
-                value={revealPassword}
-                onChange={(e) => setRevealPassword(e.target.value)}
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setRevealId(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={isRevealing}
-                  className="bg-indigo-600 hover:bg-indigo-500"
-                >
-                  {isRevealing ? "Verifying..." : "Reveal & Copy"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteId && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 transition-all animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-red-500/30 p-6 shadow-2xl ring-1 ring-red-500/10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Trash2 className="h-4 w-4 text-red-500" /> Confirm Deletion
-              </h3>
-              <button
-                onClick={() => setDeleteId(null)}
-                className="text-zinc-500 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <p className="text-sm text-zinc-400 mb-4">
-              This action cannot be undone. Enter Master Admin password to
-              confirm.
-            </p>
-
-            <form onSubmit={handleConfirmDelete}>
-              <input
-                type="password"
-                autoFocus
-                placeholder="Master password..."
-                className="w-full rounded-xl border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-red-500 focus:ring-red-500 text-sm mb-4"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDeleteId(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={deleteMutation.isLoading}
-                  className="bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20"
-                >
-                  {deleteMutation.isLoading ? "Deleting..." : "Confirm Delete"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PasswordConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={handlePasswordVerified}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        isLoading={isVerifying}
+      />
 
       {/* Success/Copy Code Modal */}
       {createdCode && (

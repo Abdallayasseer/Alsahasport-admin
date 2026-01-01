@@ -24,17 +24,16 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Prevent infinite loops if refresh fails
-    // Also skip refresh for specific endpoints that return 401 on logic failure (not token expiry)
-    const isPasswordVerification =
-      originalRequest.url?.includes("/verify-master-password") ||
-      originalRequest.url?.includes("/reveal") ||
-      (originalRequest.method === "delete" &&
-        originalRequest.url?.includes("/codes"));
+    // Only skip refresh for Password Verification if the error is explicitly "Incorrect password"
+    // This allows genuine token expiry on this endpoint (or others) to still trigger refresh/logout
+    const isIncorrectPassword =
+      originalRequest.url?.includes("/verify-master-password") &&
+      error.response?.data?.message === "Incorrect password";
 
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      !isPasswordVerification
+      !isIncorrectPassword
     ) {
       originalRequest._retry = true;
 
