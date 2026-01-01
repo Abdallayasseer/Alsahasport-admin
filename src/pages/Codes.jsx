@@ -52,18 +52,19 @@ const Codes = () => {
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     type: null, // 'DELETE' | 'REVEAL'
+    variant: "info", // ADDED DEFAULT
     data: null, // { id: string }
     title: "",
     description: "",
   });
+
+  // ... (Lines 59-411 unchanged) ...
+
   const [isVerifying, setIsVerifying] = useState(false);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createdCode, setCreatedCode] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
-
-  // Reveal Logic State
-  const [isRevealing, setIsRevealing] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -113,6 +114,7 @@ const Codes = () => {
     setConfirmModal({
       isOpen: true,
       type: "DELETE",
+      variant: "danger",
       data: { id },
       title: "Delete Activation Code",
       description:
@@ -124,6 +126,7 @@ const Codes = () => {
     setConfirmModal({
       isOpen: true,
       type: "REVEAL",
+      variant: "info",
       data: { id },
       title: "Reveal & Copy Code",
       description:
@@ -142,7 +145,7 @@ const Codes = () => {
         await deleteMutation.mutateAsync(confirmModal.data.id);
         setConfirmModal({ ...confirmModal, isOpen: false });
       } else if (confirmModal.type === "REVEAL") {
-        await executeReveal(confirmModal.data.id);
+        await executeReveal(confirmModal.data.id, password);
         setConfirmModal({ ...confirmModal, isOpen: false });
       }
     } catch (err) {
@@ -187,17 +190,16 @@ const Codes = () => {
     reset();
   };
 
-  const executeReveal = async (id) => {
-    setIsRevealing(true);
+  const executeReveal = async (id, password) => {
     try {
       // Step 2: Reveal & Copy (Direct)
-      const { data } = await api.post(`/admin/codes/${id}/reveal`);
+      const { data } = await api.post(`/admin/codes/${id}/reveal`, {
+        password,
+      });
       await navigator.clipboard.writeText(data.data.code);
       toast.success("Code copied successfully");
     } catch (err) {
       toast.error(err.response?.data?.message || "Reveal failed");
-    } finally {
-      setIsRevealing(false);
     }
   };
 
@@ -290,13 +292,15 @@ const Codes = () => {
                           <div className="font-mono text-zinc-400 text-xs">
                             ...{code._id.slice(-6)}
                           </div>
-                          <button
-                            onClick={() => handleRevealClick(code._id)}
-                            className="ml-2 rounded-md p-1 hover:bg-white/10 text-zinc-500 hover:text-white transition-all focus:outline-none"
-                            title="Copy Code"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
+                          <RoleGuard allowedRoles={["MASTER_ADMIN"]}>
+                            <button
+                              onClick={() => handleRevealClick(code._id)}
+                              className="ml-2 rounded-md p-1 hover:bg-white/10 text-zinc-500 hover:text-white transition-all focus:outline-none"
+                              title="Copy Code"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </RoleGuard>
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-6 py-5">
@@ -416,6 +420,7 @@ const Codes = () => {
         title={confirmModal.title}
         description={confirmModal.description}
         isLoading={isVerifying}
+        variant={confirmModal.variant}
       />
 
       {/* Success/Copy Code Modal */}
