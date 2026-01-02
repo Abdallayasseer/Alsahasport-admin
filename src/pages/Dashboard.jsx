@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import api from "../api/axios"; // تأكد إن المسار ده صح
+import api from "../api/axios";
 import { useAuth } from "../context/useAuth";
 import { Card } from "../components/ui/Card";
 import { Skeleton } from "../components/ui/Skeleton";
@@ -31,71 +31,8 @@ import { dashboardTimeline } from "../animations/dashboardAnimations";
 import { animateCardHover } from "../animations/commonAnimations";
 import { formatDistanceToNow } from "date-fns";
 
-// --- Mock Data Generators (احتياطي عشان لو الـ API مش شغال) ---
-const MOCK_STATS = {
-  totalUsers: 150,
-  activeSessions: 12,
-  totalCodes: 85,
-  revenue: 1250,
-  serverStatus: "Online",
-  trends: { users: 5, sessions: 10, codes: 2, revenue: 8 },
-};
-
-const MOCK_ANALYTICS = {
-  sessionsChart: Array.from({ length: 12 }, (_, i) => ({
-    time: `${i * 2}:00`,
-    value: Math.floor(Math.random() * 50) + 10,
-  })),
-  roleDistribution: [
-    { name: "Mobile", value: 45 },
-    { name: "TV", value: 30 },
-    { name: "Web", value: 25 },
-  ],
-  codesChart: Array.from({ length: 7 }, (_, i) => ({
-    date: `Day ${i + 1}`,
-    value: Math.floor(Math.random() * 20) + 5,
-  })),
-};
-
-const MOCK_ACTIVITY = [
-  {
-    id: 1,
-    title: "Code Created",
-    time: new Date(),
-    status: "success",
-    type: "CODE_CREATED",
-    details: "Standard Package",
-  },
-  {
-    id: 2,
-    title: "User Login",
-    time: new Date(Date.now() - 3600000),
-    status: "info",
-    type: "LOGIN",
-    details: "IP: 192.168.1.1",
-  },
-];
-
-const MOCK_SESSIONS = {
-  sessions: [
-    {
-      _id: "s1",
-      clientPublicIp: "156.221.10.1",
-      role: "user",
-      userAgent: "Android Mobile",
-      lastActive: new Date(),
-      ipConfidence: "HIGH",
-    },
-    {
-      _id: "s2",
-      clientPublicIp: "197.55.12.3",
-      role: "admin",
-      userAgent: "Windows Chrome",
-      lastActive: new Date(),
-      ipConfidence: "HIGH",
-    },
-  ],
-};
+// --- Constants ---
+// Mocks removed for production use
 
 // --- Components ---
 
@@ -316,66 +253,36 @@ const Dashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // --- SAFE DATA FETCHING (Never returns undefined) ---
-
-  const { data: statsData, isLoading: isStatsLoading } = useQuery({
-    queryKey: ["admin", "stats"],
+  // --- SINGLE ROBUST DATA FETCHING ---
+  const {
+    data: dashboardData,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["admin", "dashboard"],
     queryFn: async () => {
-      try {
-        const res = await api.get("/admin/stats");
-        return res.data?.data || MOCK_STATS;
-      } catch (e) {
-        console.warn("Stats API failed, using mock data");
-        return MOCK_STATS;
-      }
+      const res = await api.get("/admin/stats"); // Now returns EVERYTHING
+      return res.data.data;
     },
     refetchInterval: 30000,
   });
 
-  const { data: activityData } = useQuery({
-    queryKey: ["admin", "activity"],
-    queryFn: async () => {
-      try {
-        const res = await api.get("/admin/activity");
-        return res.data?.data || MOCK_ACTIVITY;
-      } catch (e) {
-        return MOCK_ACTIVITY;
-      }
-    },
-    refetchInterval: 15000,
-  });
+  // Safe Data Extraction (Defaults to 0/empty to prevent crashes)
+  const stats = dashboardData?.stats || {
+    totalUsers: 0,
+    activeSessions: 0,
+    totalCodes: 0,
+    revenue: 0,
+    trends: {},
+  };
+  const activity = dashboardData?.recentActivity || [];
+  const recentSessions = dashboardData?.liveSessions || [];
+  const analytics = dashboardData?.analytics || {
+    sessionsChart: [],
+    roleDistribution: [],
+    codesChart: [],
+  };
 
-  const { data: analyticsData, isLoading: isAnalyticsLoading } = useQuery({
-    queryKey: ["admin", "analytics"],
-    queryFn: async () => {
-      try {
-        const res = await api.get("/admin/analytics");
-        return res.data?.data || MOCK_ANALYTICS;
-      } catch (e) {
-        return MOCK_ANALYTICS;
-      }
-    },
-    refetchInterval: 60000,
-  });
-
-  const { data: sessionsData } = useQuery({
-    queryKey: ["sessions", "live"],
-    queryFn: async () => {
-      try {
-        const res = await api.get("/admin/sessions/live");
-        return res.data?.data || MOCK_SESSIONS;
-      } catch (e) {
-        return MOCK_SESSIONS;
-      }
-    },
-    refetchInterval: 10000,
-  });
-
-  // Assign Data safely
-  const stats = statsData || MOCK_STATS;
-  const trends = stats.trends || {};
-  const activity = activityData || [];
-  const recentSessions = sessionsData?.sessions?.slice(0, 5) || [];
   const isSystemOnline = true; // Always online as requested
 
   const timeString = new Intl.DateTimeFormat("en-US", {
@@ -397,20 +304,26 @@ const Dashboard = () => {
         toast.success("Code copied");
       }
     } catch (err) {
-      toast.error("Failed (API Mock Mode)");
+      toast.error("Failed to copy code");
     }
   };
 
   const confirmDelete = async (password, setError) => {
     try {
-      // Fake delay for mock feel
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      toast.success("Code deleted (Mock)");
+      await api.delete(`/admin/codes/${deleteModal.codeId}`);
+      toast.success("Code deleted successfully");
       setDeleteModal({ isOpen: false, codeId: null });
+      queryClient.invalidateQueries(["admin", "dashboard"]); // Refresh data
     } catch (err) {
-      setError("Failed");
+      setError(err.response?.data?.message || "Failed to delete");
     }
   };
+
+  if (isError) {
+    // In a real app we might show a retry button
+    // But keeping layout intact for now
+    //  return <div className="text-white">Error loading dashboard.</div>;
+  }
 
   return (
     <div ref={containerRef} className="space-y-8 max-w-[1600px] mx-auto pb-10">
@@ -469,24 +382,24 @@ const Dashboard = () => {
           value={stats.totalUsers?.toLocaleString() ?? "0"}
           icon={Users}
           gradient="from-indigo-500 to-indigo-600"
-          isLoading={isStatsLoading}
-          change={trends.users}
+          isLoading={isLoading}
+          change={stats.trends?.users}
         />
         <StatCard
           title="Active Sessions"
           value={stats.activeSessions?.toLocaleString() ?? "0"}
           icon={Activity}
           gradient="from-violet-500 to-fuchsia-600"
-          isLoading={isStatsLoading}
-          change={trends.sessions}
+          isLoading={isLoading}
+          change={stats.trends?.sessions}
         />
         <StatCard
           title="Total Codes"
           value={stats.totalCodes?.toLocaleString() ?? "0"}
           icon={Ticket}
           gradient="from-blue-500 to-cyan-600"
-          isLoading={isStatsLoading}
-          change={trends.codes}
+          isLoading={isLoading}
+          change={stats.trends?.codes}
         />
         <StatCard
           title="Revenue (Est.)"
@@ -498,23 +411,86 @@ const Dashboard = () => {
           }`}
           icon={TrendingUp}
           gradient="from-emerald-500 to-emerald-600"
-          isLoading={isStatsLoading}
-          change={trends.revenue}
+          isLoading={isLoading}
+          change={stats.trends?.revenue}
         />
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {!isLoading && <SessionsChart data={analytics.sessionsChart} />}
+          {isLoading && (
+            <Skeleton className="h-[300px] w-full rounded-2xl bg-zinc-900/50" />
+          )}
+        </div>
+        <div>
+          {!isLoading && <RoleDistChart data={analytics.roleDistribution} />}
+          {isLoading && (
+            <Skeleton className="h-[300px] w-full rounded-2xl bg-zinc-900/50" />
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+        {!isLoading && <CodesChart data={analytics.codesChart} />}
+        {isLoading && (
+          <Skeleton className="h-[300px] w-full rounded-2xl bg-zinc-900/50" />
+        )}
       </div>
 
       {/* Activity & Details */}
       <div className="dashboard-content-grid grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Recent Activity */}
+        <div className="xl:col-span-2 space-y-6">
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-indigo-400" /> Recent Activity
+              </h3>
+            </div>
+            <div className="space-y-0">
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="py-4 border-l border-white/5 pl-6">
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                ))
+              ) : activity.length === 0 ? (
+                <p className="text-sm text-zinc-500 py-4 pl-6">
+                  No recent activity
+                </p>
+              ) : (
+                activity.map((item) => (
+                  <TimelineItem
+                    key={item.id}
+                    {...item}
+                    onCopy={() => handleCopyRequest(item.id)}
+                    onDelete={() =>
+                      setDeleteModal({ isOpen: true, codeId: item.id })
+                    }
+                  />
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Live Sessions */}
         <div className="space-y-6">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-400" /> Live Activity
+                <Activity className="w-5 h-5 text-emerald-400" /> Live Sessions
               </h3>
               <span className="text-xs text-zinc-500">Real-time</span>
             </div>
             <div className="space-y-3">
-              {recentSessions.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))
+              ) : recentSessions.length === 0 ? (
                 <p className="text-sm text-zinc-500 text-center py-4">
                   No active sessions
                 </p>
