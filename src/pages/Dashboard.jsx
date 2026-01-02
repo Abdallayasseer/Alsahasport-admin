@@ -147,26 +147,7 @@ const TimelineItem = React.memo(
             )}
           </div>
         </div>
-        <div className="flex gap-1">
-          {type === "CODE_CREATED" && (
-            <>
-              <button
-                onClick={onCopy}
-                className="p-1.5 rounded-md hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
-                title="Reveal & Copy Code"
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={onDelete}
-                className="p-1.5 rounded-md hover:bg-red-500/10 text-zinc-400 hover:text-red-400 transition-colors"
-                title="Delete Code"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </>
-          )}
-        </div>
+        {/* Actions removed as requested */}
       </div>
     </div>
   )
