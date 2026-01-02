@@ -245,7 +245,6 @@ const Dashboard = () => {
     queryFn: async () => {
       try {
         const res = await api.get("/admin/stats");
-        console.log("Dashboard Data:", res.data); // Debug log
         return res.data.data;
       } catch (err) {
         console.error("Dashboard API Error:", err);
