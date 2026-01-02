@@ -147,7 +147,7 @@ const TimelineItem = React.memo(
             )}
           </div>
         </div>
-        <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+        <div className="flex gap-1">
           {type === "CODE_CREATED" && (
             <>
               <button
