@@ -258,11 +258,18 @@ const Dashboard = () => {
     data: dashboardData,
     isLoading,
     isError,
+    error,
   } = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: async () => {
-      const res = await api.get("/admin/stats"); // Now returns EVERYTHING
-      return res.data.data;
+      try {
+        const res = await api.get("/admin/stats");
+        console.log("Dashboard Data:", res.data); // Debug log
+        return res.data.data;
+      } catch (err) {
+        console.error("Dashboard API Error:", err);
+        throw err;
+      }
     },
     refetchInterval: 30000,
   });
@@ -320,9 +327,21 @@ const Dashboard = () => {
   };
 
   if (isError) {
-    // In a real app we might show a retry button
-    // But keeping layout intact for now
-    //  return <div className="text-white">Error loading dashboard.</div>;
+    return (
+      <div className="p-8 text-center">
+        <div className="inline-block p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+          <h3 className="text-lg font-medium text-red-500">
+            Failed to load dashboard data
+          </h3>
+          <p className="text-sm text-red-400 mt-1">
+            {error?.message || "Unknown error occurred"}
+          </p>
+          <p className="text-xs text-zinc-500 mt-2">
+            Check console for details
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
