@@ -45,8 +45,10 @@ const Login = () => {
   });
 
   const onSubmit = async (data, e) => {
-    // 1. Prevent Default Behavior (Crucial for preventing reload)
-    e?.preventDefault();
+    // 1. STRICT Prevent Default (Stop Page Reload)
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
 
     // 2. Reset Error State
     setError(null);
@@ -55,18 +57,25 @@ const Login = () => {
       // 3. Attempt Login
       const result = await login(data.username, data.password, clientIp);
 
-      // 4. Conditional Navigation
-      if (result.success) {
+      // 4. Fail-Safe Result Check & Conditional Navigation
+      if (result?.success) {
         toast.success("Welcome back, Admin!");
-        // Navigate ONLY here
+        // Navigate ONLY on explicit success
         navigate("/admin/dashboard");
       } else {
-        // 5. Failure: Set Error State & Do NOT Navigate
-        setError(result.message || "Invalid credentials");
+        // 5. Handle Failure (Set Error, Do NOT Navigate)
+        // Defensively access message to prevent crashes
+        const failMsg = result?.message || "Invalid credentials";
+        setError(failMsg);
       }
     } catch (err) {
-      console.error(err);
-      setError("An unexpected error occurred. Please try again.");
+      console.error("Login Error:", err);
+      // 6. Robust Error Extraction (Prevent 'undefined' crashes)
+      const serverMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "An unexpected error occurred.";
+      setError(serverMsg);
     }
   };
 
