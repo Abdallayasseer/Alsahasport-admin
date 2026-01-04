@@ -44,24 +44,28 @@ const Login = () => {
     },
   });
 
-  const onSubmit = async (data) => {
-    // 1. Reset Error State
+  const onSubmit = async (data, e) => {
+    // 1. Prevent Default Behavior (Crucial for preventing reload)
+    e?.preventDefault();
+
+    // 2. Reset Error State
     setError(null);
 
     try {
-      // 2. Attempt Login via AuthContext
+      // 3. Attempt Login
       const result = await login(data.username, data.password, clientIp);
 
+      // 4. Conditional Navigation
       if (result.success) {
-        // 3. Success: Notify and allow useEffect to redirect
         toast.success("Welcome back, Admin!");
-        // Navigation could also be explicit here:
+        // Navigate ONLY here
         navigate("/admin/dashboard");
       } else {
-        // 4. Failure: Set Error State (Do not redirect)
+        // 5. Failure: Set Error State & Do NOT Navigate
         setError(result.message || "Invalid credentials");
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError("An unexpected error occurred. Please try again.");
     }
   };
