@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -21,10 +21,10 @@ const Login = () => {
   const { ip: clientIp } = useIpDetection();
   const navigate = useNavigate();
   const location = useLocation();
+  const [error, setError] = useState(null); // Add local error state
 
   // Redirect Logic:
-  // If user is already authenticated (e.g. from persisted session),
-  // immediately redirect them to Dashboard to prevent re-login.
+  // If user is already authenticated, redirect to Dashboard.
   useEffect(() => {
     if (user) {
       const from = location.state?.from?.pathname || "/admin/dashboard";
@@ -45,24 +45,24 @@ const Login = () => {
   });
 
   const onSubmit = async (data) => {
+    // 1. Reset Error State
+    setError(null);
+
     try {
-      // 1. Attempt Login via AuthContext
-      //    This handles API call, token storage, and state update.
+      // 2. Attempt Login via AuthContext
       const result = await login(data.username, data.password, clientIp);
 
       if (result.success) {
-        // 2. Success: Notify and Redirect
+        // 3. Success: Notify and allow useEffect to redirect
         toast.success("Welcome back, Admin!");
-        // Navigation happens automatically via the useEffect above
-        // OR explicitly here if desired for immediate feedback before effect runs.
-        // We prefer explicit navigation here for the user interaction flow.
+        // Navigation could also be explicit here:
         navigate("/admin/dashboard");
       } else {
-        // 3. Failure: Show clean error message
-        toast.error(result.message || "Invalid credentials");
+        // 4. Failure: Set Error State (Do not redirect)
+        setError(result.message || "Invalid credentials");
       }
     } catch {
-      toast.error("An unexpected error occurred. Please try again.");
+      setError("An unexpected error occurred. Please try again.");
     }
   };
 
@@ -81,6 +81,18 @@ const Login = () => {
             Secure Admin Portal Access
           </p>
         </div>
+
+        {/* Error Alert Box */}
+        {error && (
+          <div className="rounded-md bg-red-500/10 p-4 border border-red-500/20 flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <Lock className="h-5 w-5 text-red-500" aria-hidden="true" />
+            </div>
+            <div className="flex-1 text-sm text-red-400 font-medium">
+              {error}
+            </div>
+          </div>
+        )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-5">
