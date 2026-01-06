@@ -12,7 +12,7 @@ import { Button } from "../components/ui/Button";
 
 // --- Schema Validation ---
 const loginSchema = z.object({
-  username: z.string().email("Please enter a valid email address"),
+  identifier: z.string().min(1, "Username or Email is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -39,7 +39,7 @@ const Login = () => {
   } = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      identifier: "",
       password: "",
     },
   });
@@ -55,7 +55,7 @@ const Login = () => {
 
     try {
       // 3. Attempt Login
-      const result = await login(data.username, data.password, clientIp);
+      const result = await login(data.identifier, data.password, clientIp);
 
       // 4. Fail-Safe Result Check & Conditional Navigation
       if (result?.success) {
@@ -111,7 +111,7 @@ const Login = () => {
           <div className="space-y-5">
             <div>
               <label className="block text-xs font-medium text-zinc-500 uppercase tracking-widest ml-1 mb-2">
-                Username
+                Username or Email
               </label>
               <div className="relative group">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 transition-colors duration-300">
@@ -122,17 +122,17 @@ const Login = () => {
                   autoComplete="username"
                   className={`block w-full rounded-xl border bg-zinc-950/50 py-3.5 pl-11 text-white placeholder:text-zinc-600 sm:text-sm transition-all duration-300 outline-none
                     ${
-                      errors.username
+                      errors.identifier
                         ? "border-red-500/50 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
                         : "border-white/5 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 hover:border-white/10"
                     }`}
-                  placeholder="Enter your username"
-                  {...register("username")}
+                  placeholder="Enter username or email"
+                  {...register("identifier")}
                 />
               </div>
-              {errors.username && (
+              {errors.identifier && (
                 <p className="mt-2 text-xs text-red-400 font-medium animate-pulse ml-1">
-                  {errors.username.message}
+                  {errors.identifier.message}
                 </p>
               )}
             </div>

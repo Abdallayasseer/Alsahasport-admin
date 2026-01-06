@@ -39,10 +39,10 @@ export const AuthProvider = ({ children }) => {
     verifyToken();
   }, []);
 
-  const login = useCallback(async (username, password, clientPublicIp) => {
+  const login = useCallback(async (identifier, password, clientPublicIp) => {
     try {
       const response = await api.post("/admin/login", {
-        username,
+        identifier,
         password,
         clientPublicIp,
       });
