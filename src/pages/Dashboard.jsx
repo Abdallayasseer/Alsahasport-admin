@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import api from "../api/axios";
@@ -6,11 +6,8 @@ import { useAuth } from "../context/useAuth";
 import { Card } from "../components/ui/Card";
 import { Skeleton } from "../components/ui/Skeleton";
 import PasswordConfirmationModal from "../components/modals/PasswordConfirmationModal";
-import {
-  SessionsChart,
-  CodesChart,
-  RoleDistChart,
-} from "../components/dashboard/AnalyticsCharts";
+import StatList from "../components/dashboard/StatList";
+import useMobile from "../hooks/useMobile";
 import {
   Users,
   Server,
@@ -31,6 +28,11 @@ import { dashboardTimeline } from "../animations/dashboardAnimations";
 import { animateCardHover } from "../animations/commonAnimations";
 import { formatDistanceToNow } from "date-fns";
 
+// Lazy Load Charts
+const ChartsWrapper = React.lazy(() =>
+  import("../components/dashboard/ChartsWrapper")
+);
+
 // --- Constants ---
 // Mocks removed for production use
 
@@ -40,13 +42,15 @@ const StatCard = React.memo(
   ({ title, value, change, gradient, icon: Icon, isLoading, statusColor }) => {
     const cardRef = useRef(null);
     const { contextSafe } = useGSAP({ scope: cardRef });
+    const isMobile = useMobile();
 
+    // Disable heavy animations on mobile
     const handleMouseEnter = contextSafe((e) => {
-      !isLoading && animateCardHover(e.currentTarget, true);
+      !isLoading && !isMobile && animateCardHover(e.currentTarget, true);
     });
 
     const handleMouseLeave = contextSafe((e) => {
-      !isLoading && animateCardHover(e.currentTarget, false);
+      !isLoading && !isMobile && animateCardHover(e.currentTarget, false);
     });
 
     if (isLoading) {
@@ -214,6 +218,7 @@ const LiveSessionRow = ({ session }) => {
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const isMobile = useMobile();
   const [date, setDate] = useState(new Date());
   const containerRef = useRef(null);
   const queryClient = useQueryClient();
@@ -224,9 +229,12 @@ const Dashboard = () => {
 
   useGSAP(
     () => {
-      dashboardTimeline(containerRef);
+      // Skip heavy animations on mobile
+      if (!isMobile) {
+        dashboardTimeline(containerRef);
+      }
     },
-    { scope: containerRef }
+    { scope: containerRef, dependencies: [isMobile] }
   );
 
   useEffect(() => {
@@ -415,25 +423,24 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          {!isLoading && <SessionsChart data={analytics.sessionsChart} />}
-          {isLoading && (
-            <Skeleton className="h-[300px] w-full rounded-2xl bg-zinc-900/50" />
-          )}
-        </div>
-        <div>
-          {!isLoading && <RoleDistChart data={analytics.roleDistribution} />}
-          {isLoading && (
-            <Skeleton className="h-[300px] w-full rounded-2xl bg-zinc-900/50" />
-          )}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        {!isLoading && <CodesChart data={analytics.codesChart} />}
-        {isLoading && (
-          <Skeleton className="h-[300px] w-full rounded-2xl bg-zinc-900/50" />
+      {/* Charts Section (Lazy Loaded or Replaced on Mobile) */}
+      <div className="min-h-[300px]">
+        {isMobile ? (
+          <StatList
+            sessionsData={analytics.sessionsChart}
+            roleData={analytics.roleDistribution}
+            codesData={analytics.codesChart}
+          />
+        ) : (
+          <Suspense
+            fallback={
+              <Skeleton className="h-[300px] w-full rounded-2xl bg-zinc-900/50 text-white p-10">
+                Loading Charts...
+              </Skeleton>
+            }
+          >
+            <ChartsWrapper analytics={analytics} isLoading={isLoading} />
+          </Suspense>
         )}
       </div>
 
