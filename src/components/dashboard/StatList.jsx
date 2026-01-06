@@ -7,14 +7,9 @@ const StatList = ({ stats, roleData, isLoading }) => {
   const activeSessions = stats?.activeSessions || 0;
   const totalCodes = stats?.totalCodes || 0;
 
-  // Role Breakdown
-  const adminCount = roleData
-    ? roleData.find((d) => d.name === "Admin" || d.name === "MASTER_ADMIN")
-        ?.value || 0
-    : 0;
-  const userCount = roleData
-    ? roleData.find((d) => d.name === "User")?.value || 0
-    : 0;
+  // Role Breakdown (Fetched directly from DB)
+  const adminCount = stats?.totalAdmins || 0;
+  const userCount = stats?.activeUsers || 0;
 
   // Number Formatter
   const formatNumber = (num) => {
