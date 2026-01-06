@@ -17,15 +17,27 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle 401 & Refresh
+// Response Interceptor: Handle 401 & Refresh with Mutex
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Prevent infinite loops if refresh fails
-    // Only skip refresh for Password Verification if the error is explicitly "Incorrect password"
-    // This allows genuine token expiry on this endpoint (or others) to still trigger refresh/logout
+    // Prevent infinite loops and skip specific endpoints
     const isIncorrectPassword =
       originalRequest.url?.includes("/verify-master-password") &&
       error.response?.data?.message === "Incorrect password";
@@ -35,27 +47,42 @@ api.interceptors.response.use(
       !originalRequest._retry &&
       !isIncorrectPassword
     ) {
+      if (isRefreshing) {
+        return new Promise(function (resolve, reject) {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
-        // Attempt to refresh token
-        // Assumes /auth/refresh sets a new HttpOnly cookie if successful
-        // Or returns a new accessToken if you want to store it in memory/storage
-        // Adjust based on your backend. Here we assume backend sends new accessToken.
         const { data } = await api.post("/auth/refresh");
 
         if (data.accessToken) {
           localStorage.setItem("accessToken", data.accessToken);
+          api.defaults.headers.common["Authorization"] =
+            "Bearer " + data.accessToken;
+          processQueue(null, data.accessToken);
           originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+          return api(originalRequest);
         }
-
-        return api(originalRequest);
       } catch (refreshError) {
+        processQueue(refreshError, null);
         // Refresh failed - Logout user
         localStorage.removeItem("accessToken");
         localStorage.removeItem("user");
         window.location.href = "/admin/login";
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
     return Promise.reject(error);
