@@ -427,9 +427,9 @@ const Dashboard = () => {
       <div className="min-h-[300px]">
         {isMobile ? (
           <StatList
-            sessionsData={analytics.sessionsChart}
+            stats={stats}
             roleData={analytics.roleDistribution}
-            codesData={analytics.codesChart}
+            isLoading={isLoading}
           />
         ) : (
           <Suspense
