@@ -1,7 +1,7 @@
 import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import LuxuryToaster from "./components/ui/LuxuryToaster";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/guard/ProtectedRoute";
 import MainLayout from "./components/layout/MainLayout";
@@ -53,7 +53,7 @@ function App() {
               />
             </Routes>
           </Suspense>
-          <Toaster position="top-center" reverseOrder={false} />
+          <LuxuryToaster />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

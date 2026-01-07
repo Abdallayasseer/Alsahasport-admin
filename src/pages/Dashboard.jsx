@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { useLuxuryToast } from "../hooks/useLuxuryToast";
 import api from "../api/axios";
 import { useAuth } from "../context/useAuth";
 import { Card } from "../components/ui/Card";
@@ -213,6 +213,7 @@ const LiveSessionRow = ({ session }) => {
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const toast = useLuxuryToast();
   const isMobile = useMobile();
   const [date, setDate] = useState(new Date());
   const containerRef = useRef(null);
@@ -503,6 +504,39 @@ const Dashboard = () => {
             </div>
           </Card>
         </div>
+
+        {/* Luxury Toast Demo Section */}
+        <Card className="p-6 border-indigo-500/20 bg-indigo-500/5">
+          <h3 className="text-lg font-bold text-white mb-4">
+            Luxury Toast Demo
+          </h3>
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={() => toast.success("Code deleted successfully")}
+              className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 rounded-lg transition-all"
+            >
+              Trigger Success (Emerald)
+            </button>
+            <button
+              onClick={() => toast.error("Failed to delete item")}
+              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/50 text-rose-400 rounded-lg transition-all"
+            >
+              Trigger Error (Ruby)
+            </button>
+            <button
+              onClick={() => toast.warning("Connection unstable")}
+              className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/50 text-amber-400 rounded-lg transition-all"
+            >
+              Trigger Warning (Amber)
+            </button>
+            <button
+              onClick={() => toast.info("New user registered")}
+              className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/50 text-blue-400 rounded-lg transition-all"
+            >
+              Trigger Info (Blue)
+            </button>
+          </div>
+        </Card>
       </div>
 
       <PasswordConfirmationModal
