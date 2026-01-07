@@ -198,7 +198,7 @@ const Codes = () => {
         password,
       });
       await navigator.clipboard.writeText(data.data.code);
-      toast.success("Copied to clipboard! 📋");
+      toast.success("Copied to clipboard!");
     } catch (err) {
       toast.error(err.response?.data?.message || "Reveal failed");
     }
