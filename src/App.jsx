@@ -7,7 +7,6 @@ import ProtectedRoute from "./components/guard/ProtectedRoute";
 import MainLayout from "./components/layout/MainLayout";
 import { Loader2 } from "lucide-react";
 
-// Lazy Load Pages
 const Login = lazy(() => import("./pages/Login"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Sessions = lazy(() => import("./pages/Sessions"));

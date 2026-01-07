@@ -28,13 +28,11 @@ import { dashboardTimeline } from "../animations/dashboardAnimations";
 import { animateCardHover } from "../animations/commonAnimations";
 import { formatDistanceToNow } from "date-fns";
 
-// Lazy Load Charts
 const ChartsWrapper = React.lazy(() =>
   import("../components/dashboard/ChartsWrapper")
 );
 
 // --- Constants ---
-// Mocks removed for production use
 
 // --- Components ---
 
@@ -122,40 +120,37 @@ const StatCard = React.memo(
   }
 );
 
-const TimelineItem = React.memo(
-  ({ title, time, status, type, details, onCopy, onDelete }) => (
-    <div className="relative pl-6 pb-6 border-l border-white/5 last:pb-0 group/item">
-      <div
-        className={`absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-950 ${
-          status === "success"
-            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-            : status === "warning"
-            ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-            : "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
-        }`}
-      />
-      <div className="flex justify-between items-start">
-        <div>
-          <h4 className="text-sm font-medium text-zinc-200">{title}</h4>
-          <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-500">
-            <span>
-              {time
-                ? formatDistanceToNow(new Date(time), { addSuffix: true })
-                : "Unknown time"}
-            </span>
-            {details && (
-              <>
-                <span className="text-zinc-600">•</span>
-                <span className="text-zinc-400">{details}</span>
-              </>
-            )}
-          </div>
+const TimelineItem = React.memo(({ title, time, status, details }) => (
+  <div className="relative pl-6 pb-6 border-l border-white/5 last:pb-0 group/item">
+    <div
+      className={`absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-zinc-950 ${
+        status === "success"
+          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+          : status === "warning"
+          ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+          : "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
+      }`}
+    />
+    <div className="flex justify-between items-start">
+      <div>
+        <h4 className="text-sm font-medium text-zinc-200">{title}</h4>
+        <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-500">
+          <span>
+            {time
+              ? formatDistanceToNow(new Date(time), { addSuffix: true })
+              : "Unknown time"}
+          </span>
+          {details && (
+            <>
+              <span className="text-zinc-600">•</span>
+              <span className="text-zinc-400">{details}</span>
+            </>
+          )}
         </div>
-        {/* Actions removed as requested */}
       </div>
     </div>
-  )
-);
+  </div>
+));
 
 const LiveSessionRow = ({ session }) => {
   const getDeviceIcon = (ua) => {
@@ -298,7 +293,7 @@ const Dashboard = () => {
         await navigator.clipboard.writeText(data.data.code);
         toast.success("Code copied");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to copy code");
     }
   };
