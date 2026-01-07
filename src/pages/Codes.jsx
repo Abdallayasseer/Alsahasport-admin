@@ -86,7 +86,7 @@ const Codes = () => {
     mutationFn: createCode,
     onSuccess: (response) => {
       queryClient.invalidateQueries(["codes"]);
-      toast.success("Code created successfully! 🎉");
+      toast.success("Code created successfully!");
       setIsCreateModalOpen(false);
       setCreatedCode(response.data);
     },
@@ -103,7 +103,7 @@ const Codes = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["codes"]);
-      toast.success("Code deleted permanently 🗑️");
+      toast.success("Code deleted permanently");
     },
     onError: (err) => {
       const msg = err.response?.data?.message || "Could not delete code";
@@ -171,7 +171,7 @@ const Codes = () => {
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
       }
-      toast.success("Copied to clipboard! 📋");
+      toast.success("Copied to clipboard!");
     } catch {
       toast.error("Failed to copy");
     }

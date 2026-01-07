@@ -60,7 +60,7 @@ const Login = () => {
 
       // 4. Fail-Safe Result Check & Conditional Navigation
       if (result?.success) {
-        toast.success("Welcome back, Admin! 🚀");
+        toast.success("Welcome back, Admin!");
         // Navigate ONLY on explicit success
         navigate("/admin/dashboard");
       } else {
