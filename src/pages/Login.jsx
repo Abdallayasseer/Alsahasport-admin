@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate, useLocation } from "react-router-dom";
-import toast from "react-hot-toast";
+import { useLuxuryToast } from "../hooks/useLuxuryToast";
 import { Lock, User } from "lucide-react";
 
 import { useAuth } from "../context/useAuth";
@@ -17,6 +17,7 @@ const loginSchema = z.object({
 });
 
 const Login = () => {
+  const toast = useLuxuryToast();
   const { login, user } = useAuth();
   const { ip: clientIp } = useIpDetection();
   const navigate = useNavigate();
@@ -59,7 +60,7 @@ const Login = () => {
 
       // 4. Fail-Safe Result Check & Conditional Navigation
       if (result?.success) {
-        toast.success("Welcome back, Admin!");
+        toast.success("Welcome back, Admin! 🚀");
         // Navigate ONLY on explicit success
         navigate("/admin/dashboard");
       } else {

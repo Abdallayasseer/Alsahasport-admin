@@ -17,7 +17,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import toast from "react-hot-toast";
+import { useLuxuryToast } from "../hooks/useLuxuryToast";
 
 import api from "../api/axios";
 import RoleGuard from "../components/guard/RoleGuard";
@@ -47,6 +47,7 @@ const codeSchema = z.object({
 });
 
 const Codes = () => {
+  const toast = useLuxuryToast();
   const [search, setSearch] = useState("");
   // Security Verification State
   const [confirmModal, setConfirmModal] = useState({
@@ -85,7 +86,7 @@ const Codes = () => {
     mutationFn: createCode,
     onSuccess: (response) => {
       queryClient.invalidateQueries(["codes"]);
-      toast.success("Code created successfully");
+      toast.success("Code created successfully! 🎉");
       setIsCreateModalOpen(false);
       setCreatedCode(response.data);
     },
@@ -102,10 +103,10 @@ const Codes = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["codes"]);
-      toast.success("Code deleted successfully");
+      toast.success("Code deleted permanently 🗑️");
     },
     onError: (err) => {
-      const msg = err.response?.data?.message || "Failed to delete code";
+      const msg = err.response?.data?.message || "Could not delete code";
       toast.error(msg);
     },
   });
@@ -170,7 +171,7 @@ const Codes = () => {
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
       }
-      toast.success("Code copied successfully");
+      toast.success("Copied to clipboard! 📋");
     } catch {
       toast.error("Failed to copy");
     }
@@ -197,7 +198,7 @@ const Codes = () => {
         password,
       });
       await navigator.clipboard.writeText(data.data.code);
-      toast.success("Code copied successfully");
+      toast.success("Copied to clipboard! 📋");
     } catch (err) {
       toast.error(err.response?.data?.message || "Reveal failed");
     }

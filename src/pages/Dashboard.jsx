@@ -292,7 +292,7 @@ const Dashboard = () => {
       const { data } = await api.post(`/admin/codes/${codeId}/reveal`);
       if (data.success && data.data?.code) {
         await navigator.clipboard.writeText(data.data.code);
-        toast.success("Code copied");
+        toast.success("Copied to clipboard! 📋");
       }
     } catch {
       toast.error("Failed to copy code");
@@ -302,7 +302,7 @@ const Dashboard = () => {
   const confirmDelete = async (password, setError) => {
     try {
       await api.delete(`/admin/codes/${deleteModal.codeId}`);
-      toast.success("Code deleted successfully");
+      toast.success("Code deleted permanently 🗑️");
       setDeleteModal({ isOpen: false, codeId: null });
       queryClient.invalidateQueries(["admin", "dashboard"]); // Refresh data
     } catch (err) {
