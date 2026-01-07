@@ -1,12 +1,27 @@
 // Utility to generate UI sounds using the Web Audio API
 // This avoids external dependencies and CORS/403 issues with audio files.
 
+let audioContext = null;
+
+const getAudioContext = () => {
+  if (!audioContext) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      audioContext = new AudioContext();
+    }
+  }
+  // Resume context if it's suspended (common browser policy)
+  if (audioContext && audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+  return audioContext;
+};
+
 export const playSuccessSound = () => {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
-    const ctx = new AudioContext();
     // Nice high "ding" - Sine wave
     // Play a major third interval C6 (1046.5Hz) -> E6 (1318.5Hz) quickly
 
@@ -42,10 +57,8 @@ export const playSuccessSound = () => {
 
 export const playErrorSound = () => {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
     // Low dissonant "thud" with triangle wave
     const osc = ctx.createOscillator();
@@ -70,10 +83,8 @@ export const playErrorSound = () => {
 
 export const playWarningSound = () => {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
     // Simple "pluck"
     const osc = ctx.createOscillator();
@@ -98,10 +109,8 @@ export const playWarningSound = () => {
 export const playInfoSound = () => {
   // Gentle pop, essentially the same as success but softer/single note
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (!ctx) return;
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
