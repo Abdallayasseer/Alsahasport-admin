@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { AuthContext } from "./context";
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,17 +69,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("user");
-    setUser(null);
+  const logout = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
     try {
-      // Optional: Notify backend to invalidate session
-      api.post("/auth/logout");
-    } catch {
-      /* ignore */
+      if (token) {
+        await api.post(
+          "/auth/logout",
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Logout failed", error);
+    } finally {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+      setUser(null);
+      navigate("/admin/login");
     }
-  }, []);
+  }, [navigate]);
 
   const value = useMemo(
     () => ({
